@@ -605,6 +605,9 @@ void own_ranges(void) {
         while (s < next && (sLog[s] == '\n' || sLog[s] == ' ')) {
             s++;
         }
+        if (!it.info && !it.tabBar && s + 2 < next && sLog[s] == '/' && sLog[s + 1] == ' ' && sLog[s + 2] == '{') {
+            s += 2; // a tab's "/" decoration left over in front of a combo box's "{": the combo still starts at its brace
+        }
         if (it.tabBar || (!it.info && s < next && sLog[s] == '{')) {
             int e = s;
             while (e < next && sLog[e] != '\n') {

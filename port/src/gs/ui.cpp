@@ -2041,6 +2041,9 @@ static char sBanner[256];
 static Uint64 sBannerUntil; // 0: while the game waits
 extern "C" void Port_UiBanner(const char *text, int ms) {
     if (text != NULL) {
+        if (strcmp(sBanner, text) != 0) { // (said once per line: the game's thread calls this again while it waits)
+            PortA11y_Say(text, 1);
+        }
         SDL_strlcpy(sBanner, text, sizeof(sBanner));
     }
     if (text == NULL && ms <= 0) {
