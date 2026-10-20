@@ -3082,6 +3082,8 @@ typedef struct {
 } A11yAdxPlayer;
 _Static_assert(sizeof(A11yAdxPlayer) == 0x14, "AdxPlayer");
 extern A11yAdxPlayer gAdxPlayerTbl[6];
+#define ADX_CH_MUSIC 0 /* "BGM": the music */
+#define ADX_CH_STAGE 1 /* "MAP": a stage's background sound */
 #define ADX_CH_VOICE0 4
 #define ADX_CH_VOICE1 5
 
@@ -3101,6 +3103,7 @@ static int sBlank;               /* blanks counted since then */
 static int sVoiceBlank = -1000;  /* the blank the last voice with a shown line started in */
 static int sMenuVoices = 100;    /* bt3_settings.txt a11y_menu_voices, percent */
 static int sFightVoices = 100;   /* bt3_settings.txt a11y_fight_voices, percent (default: a11y_menu_voices) */
+static int sFightMusic = 100;    /* bt3_settings.txt a11y_fight_music, percent */
 
 /* gs/snd_adx.c, ADXT_StartAfs: the game started a stream (path: its file). */
 void PortA11y_StreamStart(const char *path) {
@@ -3123,8 +3126,11 @@ void PortA11y_StreamStart(const char *path) {
 /* gs/a11y.c, PortA11y_StreamGain (for gs/snd_adx.c, apply_volume): the percent of the game's own volume one of its
    players gets, or -1 to leave it alone. The two voice channels play at a11y_menu_voices percent, so the screen
    reader can be heard over the guides, and in a battle at a11y_fight_voices (the same unless set: the fighters'
-   voices do not jump up as the battle starts). An int, not a gain: this file is built soft-float and gs/ is not, so a
-   float returned from here would not reach the caller (it would read another register). */
+   voices do not jump up as the battle starts). In a battle the music and the stage's background (the first two
+   players) play at a11y_fight_music percent, so that the accessibility's sounds are heard over them; it is the same
+   from the battle's loading to its result menu, so it does not jump while the fight is on. An int, not a gain: this
+   file is built soft-float and gs/ is not, so a float returned from here would not reach the caller (it would read
+   another register). */
 int PortA11y_VoicePercent(const void *player) {
     if (!sOn || player == NULL) {
         return -1;
@@ -3133,7 +3139,28 @@ int PortA11y_VoicePercent(const void *player) {
         player == (const void *)gAdxPlayerTbl[ADX_CH_VOICE1].adxt) {
         return in_battle() ? sFightVoices : sMenuVoices;
     }
+    if (in_battle() && sFightMusic != 100 &&
+        (player == (const void *)gAdxPlayerTbl[ADX_CH_MUSIC].adxt || player == (const void *)gAdxPlayerTbl[ADX_CH_STAGE].adxt)) {
+        return sFightMusic;
+    }
     return -1;
+}
+
+/* For the settings window: the music's percent in a battle, and setting it (stored, saved by Port_SettingsWrite). */
+int PortA11y_FightMusic(void) {
+    int v;
+
+    if (sOn) {
+        return sFightMusic;
+    }
+    v = Port_Setting("a11y_fight_music", 100);
+    return v < 0 ? 0 : v > 100 ? 100 : v;
+}
+
+void PortA11y_SetFightMusic(int percent) {
+    sFightMusic = percent < 0 ? 0 : percent > 100 ? 100 : percent;
+    Port_SettingSave("a11y_fight_music", sFightMusic);
+    Port_AudioRefresh();
 }
 
 /* For the settings window (gs/a11y_ui.cpp): the voices' percent in menus (fight 0) or in a battle (fight 1), and
@@ -3463,6 +3490,8 @@ extern int BtlCharApi_GetHp(int objId), BtlCharApi_GetHpMax(int objId), BtlCharA
 extern int BtlSide_IsPoweredUp(int side), BtlSide_CountAlive(int side);
 extern int PortA11y_GaugesAsked(int fight); /* gs/a11y.c */
 extern int PortA11y_GaugesQuery(int side);  /* a11y_fight.c: the beeps; 2 set when the gauges are said too */
+extern void PortA11y_WhereQuery(void);      /* a11y_fight.c: where the rival is, a ping from there and its words */
+#define ASK_WHERE 3                         /* PortA11y_GaugesAsked: where the rival is (1, 2: a player's gauges) */
 extern void PortA11y_PowerCue(int side, int kind, int count); /* a11y_fight.c: the cue as a sound, the voice or both */
 extern void PortA11y_FightAlerts(int fight); /* a11y_fight.c: distance, the stage's edge, health */
 extern void PortA11y_FightMenu(int open);    /* gs/a11y.c: a fight's pause menu is open */
@@ -3505,6 +3534,10 @@ static void fight_gauges(void) {
     }
     if (!fight) {
         PortA11y_Note("gauges asked for outside a fight");
+        return;
+    }
+    if (ask == ASK_WHERE) {
+        PortA11y_WhereQuery();
         return;
     }
     if (!(PortA11y_GaugesQuery(side) & 2)) {
@@ -3659,6 +3692,8 @@ void PortA11y_GameTick(void) {
         sMenuVoices = v < 0 ? 0 : v > 100 ? 100 : v;
         v = Port_Setting("a11y_fight_voices", sMenuVoices);
         sFightVoices = v < 0 ? 0 : v > 100 ? 100 : v;
+        v = Port_Setting("a11y_fight_music", 100);
+        sFightMusic = v < 0 ? 0 : v > 100 ? 100 : v;
     }
     sBlank++;
     battle_watch();

@@ -14,11 +14,13 @@
  *                     a11y_key_repeat   the repeat key, an SDL scancode (default F2); the controller's Select
  *                                       tapped alone (a11y_pad.c) and its touchpad repeat too, except in a fight
  *                     a11y_key_gauges1  the keys that say player 1's and player 2's gauges in a fight (default F3
- *                     a11y_key_gauges2  and F4); in a fight a tap of Select says the player's own (twice: the
- *                                       rival's), the touchpad click those of the half it is clicked on
+ *                     a11y_key_gauges2  and F4); in a fight a tap of Select says where the rival is, two taps the
+ *                                       player's own gauges, three the rival's; the touchpad click those of the
+ *                                       half it is clicked on
+ *                     a11y_key_where    the key that says where the rival is (default F5)
  *                     a11y_log=1        the log below, into a11y_log.txt in the program's folder (for a report)
- *                     a11y_cue_volume   the fight's cues (a11y_game.c: a transformation or the Ultimate Blast within
- *                                       reach), in percent: default 60, 0 turns them off
+ *                     a11y_cue_volume   the accessibility's sounds in a fight (a11y_tones.c), in percent of a loudness
+ *                                       scale (3 dB each tenth): default 60, 0 turns them off
  *                     a11y_lang="pt"    the language to speak, a code of two or three letters (default: the
  *                                       system's preferred language)
  *                     a11y_missing=1    out of English, adds each line said without a translation, once, to
@@ -26,8 +28,9 @@
  *   $BT3_A11Y_LOG=<file>                writes what is said, one line each with the blank (tests without a screen
  *                                       reader: the headless build has no library), and notes on what changed on
  *                                       the screen, marked "#"
- *   $BT3_A11Y_ASK=<n>                   asks for the gauges every n blanks, player 1's and player 2's in turn, as
- *                                       their keys would (tests: without a window no key can be pressed)
+ *   $BT3_A11Y_ASK=<n>                   asks every n blanks, in turn, where the rival is, player 1's gauges, where,
+ *                                       player 2's, as their keys would (tests: without a window no key can be
+ *                                       pressed)
  *   $BT3_A11Y_LANG=<code>               the language, over a11y_lang
  *   a11y_<code>.txt                     the lines to say instead of the English ones (see "translations" below);
  *                                       a11y_es.txt comes with the program
@@ -205,7 +208,8 @@ static PrismBackend *choose_backend(PrismContext *ctx) {
 /* ---- the speaker ---- */
 
 static volatile int sOn; /* set once by the game's thread before the speaker starts; read by the render thread */
-static int sRepeatKey, sGaugeKey[2], sCueVolume;
+static int sRepeatKey, sGaugeKey[2], sWhereKey, sCueVolume;
+#define ASK_WHERE 3 /* sAsk: where the rival is (1 and 2 are the players' gauges) */
 static int sTranslate;         /* the language is not English */
 static char sLang[4] = "en";   /* its code: two or three small letters */
 static int sFrame; /* blanks since the start (only for the log) */
@@ -639,6 +643,7 @@ static void start(void) {
     sRepeatKey = Port_Setting("a11y_key_repeat", SDL_SCANCODE_F2);
     sGaugeKey[0] = Port_Setting("a11y_key_gauges1", SDL_SCANCODE_F3);
     sGaugeKey[1] = Port_Setting("a11y_key_gauges2", SDL_SCANCODE_F4);
+    sWhereKey = Port_Setting("a11y_key_where", SDL_SCANCODE_F5);
     sCueVolume = Port_Setting("a11y_cue_volume", 60);
     sCueVolume = sCueVolume < 0 ? 0 : sCueVolume > 100 ? 100 : sCueVolume;
     sLock = SDL_CreateMutex();
@@ -676,7 +681,6 @@ void PortA11y_SetCueVolume(int percent) {
     sCueVolume = percent < 0 ? 0 : percent > 100 ? 100 : percent;
     Port_SettingSave("a11y_cue_volume", sCueVolume);
 }
-
 /* Says a message (UTF-8). flags: A11Y_INTERRUPT, or 0 to queue it after the one before. */
 void PortA11y_Say(const char *text, int flags) {
     size_t len;
@@ -704,8 +708,9 @@ void PortA11y_Note(const char *text) {
     }
 }
 
-/* snd_adx.c, apply_volume: the gain on top of the game's own for one of its players. a11y_game.c decides it as a
-   percent: it is built soft-float, so it cannot hand a float to this side. */
+/* snd_adx.c, apply_volume: the gain on top of the game's own for one of its players (the voices, and in a fight the
+   music and the stage's background). a11y_game.c decides it as a percent: it is built soft-float, so it cannot hand a
+   float to this side. */
 float PortA11y_StreamGain(const void *player) {
     extern int PortA11y_VoicePercent(const void *player);
     int percent = PortA11y_VoicePercent(player);
@@ -749,6 +754,8 @@ void PortA11y_Event(const SDL_Event *ev) {
             PortA11y_Repeat();
         } else if ((int)ev->key.scancode == sGaugeKey[0] || (int)ev->key.scancode == sGaugeKey[1]) {
             SDL_SetAtomicInt(&sAsk, (int)ev->key.scancode == sGaugeKey[0] ? 1 : 2);
+        } else if ((int)ev->key.scancode == sWhereKey) {
+            SDL_SetAtomicInt(&sAsk, ASK_WHERE);
         }
     } else if (ev->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && ev->gbutton.button == SDL_GAMEPAD_BUTTON_TOUCHPAD) {
         side = sTouchX >= 0.5f ? 1 : 0;
@@ -762,37 +769,61 @@ void PortA11y_Event(const SDL_Event *ev) {
     }
 }
 
-/* The Select button tapped alone (a11y_pad.c, the render thread), by a player (0 or 1), `taps` in a row: in a
-   fight the gauges of the player's own side (online, the side this copy plays), and from the second tap the rival's;
-   elsewhere what was said last, again. The same for every controller, which the touchpad is not. */
-void PortA11y_SelectTap(int player, int taps) {
-    extern int Port_NetActive(void), Port_NetMe(void); /* net.c */
-    int side;
+/* Taps of Select in a fight or its pause, waiting for the row to end: taps in a row and the player (render thread),
+   and when the last one was (SDL's milliseconds); the game's thread takes them (tap_row) 0.4 s after the last. */
+static SDL_SpinLock sTapLock;
+static int sTapCount, sTapPlayer;
+static Uint64 sTapAt;
+#define TAP_ROW_MS 400 /* (a11y_pad.c counts a tap within 0.4 s of the one before as the next in the row) */
 
+/* The Select button tapped alone (a11y_pad.c, the render thread), by a player (0 or 1), `taps` in a row. In a fight
+   and in its pause the row is taken whole once it has ended (tap_row): one tap does not first do what one tap does
+   and then what two do. Elsewhere what was said last, again, at once. The same for every controller, which the
+   touchpad is not. */
+void PortA11y_SelectTap(int player, int taps) {
     if (!sOn) {
         return;
     }
-    if (SDL_GetAtomicInt(&sFight)) {
-        side = Port_NetActive() ? Port_NetMe() & 1 : player & 1;
-        SDL_SetAtomicInt(&sAsk, 1 + (taps > 1 ? side ^ 1 : side));
-    } else if (SDL_GetAtomicInt(&sFightMenu)) {
-        extern void PortA11y_GlossaryStep(int step); /* a11y_glossary.c: the next sound and its meaning */
-        PortA11y_GlossaryStep(taps > 1 ? -2 : 1);       /* (two taps: the one before the first tap's) */
+    if (SDL_GetAtomicInt(&sFight) || SDL_GetAtomicInt(&sFightMenu)) {
+        SDL_LockSpinlock(&sTapLock);
+        sTapCount = taps;
+        sTapPlayer = player & 1;
+        sTapAt = SDL_GetTicks();
+        SDL_UnlockSpinlock(&sTapLock);
     } else {
         PortA11y_Repeat();
     }
+}
+
+/* The game's thread: a row of taps that has ended, or 0; *player whose. */
+static int tap_row(int *player) {
+    int taps = 0;
+
+    SDL_LockSpinlock(&sTapLock);
+    if (sTapCount > 0 && SDL_GetTicks() - sTapAt >= TAP_ROW_MS) {
+        taps = sTapCount;
+        *player = sTapPlayer;
+        sTapCount = 0;
+    }
+    SDL_UnlockSpinlock(&sTapLock);
+    return taps;
 }
 
 /* For a11y_game.c, once per blank: `open` while a fight's pause menu is open. There a tap of Select goes through the
    sound glossary (PortA11y_SelectTap); the first time the menu opens in a run, that is said after the menu. */
 void PortA11y_FightMenu(int open) {
     static int told;
+    int taps, player;
 
     if (open && !SDL_GetAtomicInt(&sFightMenu) && !told) {
         told = 1;
         PortA11y_Say(PortA11y_TrSense(NULL, "In the pause, Select plays the sound glossary, one sound at a time; twice quickly, the one before."), 0);
     }
     SDL_SetAtomicInt(&sFightMenu, open);
+    if (open && (taps = tap_row(&player)) > 0) {
+        extern void PortA11y_GlossaryStep(int step); /* a11y_glossary.c: the next sound and its meaning */
+        PortA11y_GlossaryStep(taps > 1 ? -1 : 1);
+    }
 }
 
 /* gs_input.c, Port_PadRead: 1 while Select is the reader's and not the game's. In a fight the game reads Select only
@@ -807,109 +838,29 @@ int PortA11y_TakesSelect(void) {
 }
 
 /* For a11y_game.c, once per blank: whether a fight is on with no menu over it (the touchpad click asks for the gauges
-   then), and the gauges asked for since the last call (1 + the player's side, 0 none). */
+   then), and what was asked for since the last call: 1 + a player's side for the gauges, ASK_WHERE for where the
+   rival is, 0 nothing. A row of Select taps that has ended: one, where the rival is; two, the player's own gauges
+   (online, the side this copy plays); three, the rival's. BT3_A11Y_ASK=<n> (tests): every n blanks in turn where,
+   player 1's gauges, where, player 2's. */
 int PortA11y_GaugesAsked(int fight) {
+    extern int Port_NetActive(void), Port_NetMe(void); /* net.c */
     static int every = -1;
-    int ask;
+    int ask, taps, player, side;
 
     if (every < 0) {
         every = getenv("BT3_A11Y_ASK") != NULL ? atoi(getenv("BT3_A11Y_ASK")) : 0;
     }
     SDL_SetAtomicInt(&sFight, fight);
     ask = SDL_SetAtomicInt(&sAsk, 0);
+    if (fight && (taps = tap_row(&player)) > 0) {
+        side = Port_NetActive() ? Port_NetMe() & 1 : player;
+        ask = taps == 1 ? ASK_WHERE : 1 + (taps == 2 ? side : side ^ 1);
+    }
     if (ask == 0 && every > 0 && sFrame % every == 0) {
-        ask = 1 + (sFrame / every & 1);
+        static const int kTurn[4] = {ASK_WHERE, 1, ASK_WHERE, 2};
+        ask = kTurn[sFrame / every & 3];
     }
     return ask;
-}
-
-/* ---- the fight's cues ---- */
-
-#define CUE_RATE 48000
-#define CUE_MAX (CUE_RATE * 450 / 1000) /* the longest cue */
-#define CUE_EDGE (CUE_RATE * 5 / 1000)  /* (no cue starts at full strength: no click) */
-#define CUE_TAU 6.2831853f
-
-extern SDL_AudioDeviceID Port_AudioDevice(void); /* snd_adx.c */
-
-static SDL_AudioStream *sCue;
-static int sCueTried;
-
-/* The sound of a cue, -1..1, into out (CUE_MAX samples); returns how many. Two that cannot be taken for each other:
-   kind 0 (a transformation) a tone that slides up from E4 to B5 and holds a moment, like powering up; kind 1 (the
-   Ultimate Blast) a small bell struck twice on the same note, A5. */
-static int cue_wave(int kind, float *out) {
-    int len = kind == 0 ? CUE_RATE * 320 / 1000 : CUE_RATE * 420 / 1000, glide = CUE_RATE * 240 / 1000, i, k, t;
-    float phase = 0.0f, s, x, f;
-
-    for (i = 0; i < len; i++) {
-        if (kind == 0) {
-            /* three times the pitch over the glide, then held; the phase is summed since the pitch moves */
-            f = 329.63f * powf(3.0f, (float)(i < glide ? i : glide) / glide);
-            phase += CUE_TAU * f / CUE_RATE;
-            phase -= phase > CUE_TAU ? CUE_TAU : 0.0f;
-            s = 0.5f * (sinf(phase) + 0.3f * sinf(2.0f * phase) + 0.1f * sinf(3.0f * phase));
-        } else {
-            /* a bell: its partials (1, 2.76 and 5.40 times the note) fall away, the high ones faster */
-            s = 0.0f;
-            for (k = 0; k < 2; k++) {
-                if ((t = i - k * (CUE_RATE * 120 / 1000)) < 0) {
-                    continue;
-                }
-                x = (float)t / CUE_RATE;
-                s += (t < CUE_EDGE ? (float)t / CUE_EDGE : 1.0f) *
-                     (expf(-9.0f * x) * sinf(CUE_TAU * 880.0f * x) + 0.35f * expf(-18.0f * x) * sinf(CUE_TAU * 2428.8f * x) +
-                      0.15f * expf(-30.0f * x) * sinf(CUE_TAU * 4752.0f * x));
-            }
-            s *= 0.7f;
-        }
-        /* in over the first 5 ms and out over the last 50 */
-        s *= (i < CUE_EDGE ? (float)i / CUE_EDGE : 1.0f) * (len - i < CUE_EDGE * 10 ? (float)(len - i) / (CUE_EDGE * 10) : 1.0f);
-        out[i] = s > 1.0f ? 1.0f : s < -1.0f ? -1.0f : s;
-    }
-    return len;
-}
-
-/* The cue as it is played: 16-bit stereo at CUE_RATE, on the left for player 1 (side 0) and on the right for player
-   2, the other side at a fifth; into out (CUE_MAX frames). Returns the frames. */
-static int cue_pcm(int side, int kind, int16_t *out) {
-    static float wave[CUE_MAX];
-    float loud = 0.6f * (float)sCueVolume / 100.0f, soft = loud * 0.2f; /* (as loud as the fight's tones: a11y_tones.c) */
-    int len = cue_wave(kind, wave), i;
-
-    for (i = 0; i < len; i++) {
-        out[i * 2] = (int16_t)(wave[i] * (side == 0 ? loud : soft) * 32767.0f);
-        out[i * 2 + 1] = (int16_t)(wave[i] * (side == 0 ? soft : loud) * 32767.0f);
-    }
-    return len;
-}
-
-/* A cue for a11y_game.c (the game's thread), made here, not one of the game's sounds: kind 0, one transformation
-   more can be taken; kind 1, the Ultimate Blast can be fired. Two at the same time sound one after the other. */
-void PortA11y_Cue(int side, int kind) {
-    static int16_t buf[CUE_MAX * 2];
-    SDL_AudioDeviceID dev;
-    SDL_AudioSpec spec;
-
-    if (!sOn || sCueVolume <= 0 || (unsigned)kind > 1) {
-        return;
-    }
-    if (sCue == NULL && !sCueTried) {
-        if ((dev = Port_AudioDevice()) == 0) {
-            return; /* (no sound device, or none yet) */
-        }
-        sCueTried = 1;
-        spec.format = SDL_AUDIO_S16;
-        spec.channels = 2;
-        spec.freq = CUE_RATE;
-        if ((sCue = SDL_CreateAudioStream(&spec, NULL)) != NULL && !SDL_BindAudioStream(dev, sCue)) {
-            SDL_DestroyAudioStream(sCue);
-            sCue = NULL;
-        }
-    }
-    if (sCue != NULL) {
-        SDL_PutAudioStreamData(sCue, buf, cue_pcm(side, kind, buf) * 4);
-    }
 }
 
 /* One of the game's strings (UTF-16 in the machine's order, U+FEFF first, '\n' between lines) as UTF-8 on one

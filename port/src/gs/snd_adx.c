@@ -57,6 +57,7 @@ typedef struct Player {
 
 static Player sPlayers[MAX_PLAYERS];
 extern int gPortMusicFollows, gPortStereoStreams; /* (below, with the volumes) */
+extern int gPortMusicPercent, gPortSePercent, gPortVoicePercent, gPortStagePercent;
 
 /* plat_sndstate.c: which players exist and, counted in vertical blanks, what they report: the part of this that is
    the game's state. The second is used when the state must not depend on the sound device (sByTicks). */
@@ -174,6 +175,15 @@ static int device(void) {
             else {
                 SDL_ResumeAudioDevice(sDevice);
                 fprintf(stderr, "bt3: sound: %s\n", SDL_GetCurrentAudioDriver());
+            }
+            if (!GsGpu_Enabled()) {
+                /* (with no window the renderer, which reads the four volumes with its settings, is not started: a
+                   test with sound takes them from the settings here, so that one kind can be heard alone) */
+                extern int Port_Setting(const char *name, int def); /* plat_settings.c */
+                gPortMusicPercent = Port_Setting("music", 100);
+                gPortSePercent = Port_Setting("effects", 100);
+                gPortVoicePercent = Port_Setting("voices", gPortSePercent);
+                gPortStagePercent = Port_Setting("stage_sounds", gPortSePercent);
             }
         }
     }
@@ -413,7 +423,7 @@ int Port_StereoStreams(void) {
     return gPortStereoStreams;
 }
 
-extern float PortA11y_StreamGain(const void *player); /* a11y.c: the voices are lower in the menus */
+extern float PortA11y_StreamGain(const void *player); /* a11y.c: the voices lower, and the music in a fight */
 
 static void apply_volume(Player *p) {
     if (p->stream != NULL) {
@@ -685,6 +695,11 @@ void ADXT_SetOutPan(void *adxt, int chan, int pan) {
 
 void ADXT_SetOutputMono(int flag) {
     sMono = flag != 0;
+}
+
+/* 1 while the game's own Stereo / Mono option is on Mono (a11y_tones.c puts its placed sounds in the middle then). */
+int Port_AudioMono(void) {
+    return sMono;
 }
 
 int ADXT_GetStat(void *adxt) {
