@@ -2923,8 +2923,17 @@ extern int PortA11y_SkillListShown(void);
    (src/battle/hud_0_b.c, BtlMenu_GetText). */
 extern struct { char unk0[0x28]; uint32_t GAME_PTR battle; } GAME_PTR gCommonRes;
 
-/* include/battle/battle.h: BattleWork, its flags and `running` (see battle_watch below). */
-extern struct { char unk0[0x19F0]; uint64_t flags; int running; } gBattleWork;
+/* include/battle/battle.h: BattleWork, its result block (+0x1938, Battle_GetResult: who won and why, filled by the
+   fight's sequence when it ends, src/battle/btl_seq.c), its flags and `running` (see battle_watch below). */
+extern struct {
+    char unk0[0x1938];
+    int winner; /* 0x1938: BTL_RESULT_ bits: 1 side 0 won, 2 side 1, 4 a draw, 8 left from the pause, 0x10 a replay's */
+    int reason; /* 0x193C: BTL_REASON_ bits: 1 K.O., 2 time up, 4 out of the ring (fighter flag 7) */
+    char unk1940[0x19F0 - 0x1940];
+    uint64_t flags;
+    int running;
+} gBattleWork;
+_Static_assert(offsetof(__typeof__(gBattleWork), reason) == 0x193C && offsetof(__typeof__(gBattleWork), flags) == 0x19F0, "BattleWork");
 #define BATTLE_FLAG_PAUSE_MENU 0x4000 /* the pause menu is open */
 #define BATTLE_FLAG_PAUSE 0x100 /* the fight is frozen (offline, set with the pause menu) */
 
@@ -3421,6 +3430,8 @@ void PortA11y_FontText(int kind, int arg, int flags) {
    reader, which the player asked for again, unless the Accessibility tab's "Technique names" is off (then only
    noted in the log). */
 extern int PortA11y_TechniqueNames(void); /* a11y_fight.c */
+#define NAME_SHORT 48 /* bytes: a line of the fight shorter than this is a name (a technique's), not a sentence */
+#define NAME_GAP 90   /* blanks between two names said in a fight: 1.5 s */
 
 static void shown_text(void) {
     A11yMsgWin GAME_PTR w = gMsgWin;
@@ -3475,6 +3486,19 @@ static void shown_text(void) {
     }
     if (text[0] != '\0' && quiet && !PortA11y_TechniqueNames()) {
         snprintf(note, sizeof(note), "in a fight, not said: %s", text);
+        PortA11y_Note(note);
+    } else if (text[0] != '\0' && quiet) {
+        /* In a fight: queued, so that it does not cut what is being said nor drop the important moments queued
+           (an interrupting line empties the queue: gs/a11y.c); a short one, a technique's name, at most one every
+           1.5 s, the others noted only (they were long gone by the time a queue of them was said). */
+        static int lastName = -100000;
+        if (used < NAME_SHORT && sBlank - lastName < NAME_GAP) {
+            snprintf(note, sizeof(note), "technique name: dropped (1.5 s): %s", text);
+        } else {
+            lastName = used < NAME_SHORT ? sBlank : lastName;
+            snprintf(note, sizeof(note), used < NAME_SHORT ? "technique name: said: %s" : "fight text: said: %s", text);
+            PortA11y_Say(text, 0);
+        }
         PortA11y_Note(note);
     } else if (text[0] != '\0') {
         PortA11y_Say(text, follow());
@@ -3679,6 +3703,125 @@ static void fight_intro(void) {
     PortA11y_Note("fight: the opening described");
 }
 
+/* Who won, said as the fight ends (when the game shows its K.O. or its time up, before the win talk and the menu
+   after the fight, which said only "Fight over"): "K.O.: you win, with Goku", "Time up: the rival wins, Vegeta",
+   "Time up: a draw". You are the side whose alerts these are (online the side this copy plays, else player 1); the
+   fighter's name when a select named it (sNameCache). The result must hold 10 blanks (online a guessed finish can
+   be taken back), and a fight left from the pause or a replay's end says nothing. */
+#define WIN_HOLD 10
+static void fight_result(void) {
+    static int armed, said, held, last;
+    int w = gBattleWork.winner, why = gBattleWork.reason, me, side, chara;
+    char text[256], body[192], name[160], note[128];
+    const char *how;
+
+    if (!in_battle()) {
+        armed = said = held = last = 0;
+        return;
+    }
+    if (fighting() && w == 0) {
+        armed = 1; /* (this fight's result: the block may still hold the last one's until the game clears it) */
+    }
+    if (!armed || said || w == 0 || (w & 0x18) || !(w & 7)) {
+        held = 0;
+        last = w;
+        return;
+    }
+    held = w == last ? held + 1 : 0;
+    last = w;
+    if (held < WIN_HOLD) {
+        return;
+    }
+    said = 1;
+    me = Port_NetActive() ? Port_NetMe() & 1 : 0;
+    how = why & 1 ? tr("K.O.") : why & 2 ? tr("Time up") : why & 4 ? tr("Out of the ring") : NULL;
+    side = w & 4 ? -1 : w & 1 ? 0 : 1;
+    if (side < 0) {
+        snprintf(body, sizeof(body), "%s", tr("a draw"));
+    } else {
+        chara = BtlCharApi_GetChara(side);
+        name[0] = '\0';
+        if (chara >= 0 && chara < MCHR_RANDOM && sNameCache[chara][0] != '\0') {
+            cached_name(name, sizeof(name), chara);
+        }
+        if (name[0] == '\0') {
+            snprintf(body, sizeof(body), "%s", side == me ? tr("you win") : tr("the rival wins"));
+        } else if (side == me) {
+            snprintf(body, sizeof(body), tr("you win, with %s"), name);
+        } else {
+            snprintf(body, sizeof(body), tr("the rival wins, %s"), name);
+        }
+    }
+    if (how != NULL) {
+        snprintf(text, sizeof(text), "%s: %s", how, body);
+    } else { /* (no reason the reader knows: the words alone) */
+        snprintf(text, sizeof(text), tr("Result: %s"), body);
+    }
+    snprintf(note, sizeof(note), "winner: %s (side %d), result %#x, reason %#x", side < 0 ? "draw" : side == me ? "you" : "the rival",
+             side, w, why);
+    PortA11y_Note(note);
+    heading(text);
+}
+
+/* The first time (setting a11y_tour, bit 0): a welcome, in the quiet before the title (after the memory card's
+   messages, or with "Press START" at the latest): what Select does, with the names of the controller in the hands
+   (or the keys), how the settings open, and that the blind player profile is on when it was applied now
+   (a11y_fight.c). A profile applied in a later run is said by itself. */
+extern int PortA11y_ProfileTick(void);   /* a11y_fight.c: -1 not decided yet, 1 applied now */
+extern int PortA11y_PadFamily(int player); /* gs/a11y_pad.c: 0 the keyboard */
+extern void Port_SettingsWrite(void);
+#define ACTION_START 14 /* gs_input.c, kActions */
+#define ACTION_SELECT 15
+#define TOUR_WELCOME 1  /* a11y_tour: the welcome was said */
+static void welcome(void) {
+    static int done, seen, quiet;
+    const char *sel, *start;
+    char text[A11Y_TEXT];
+    int profile, tour;
+
+    if (done || (profile = PortA11y_ProfileTick()) < 0) {
+        return;
+    }
+    tour = Port_Setting("a11y_tour", 0);
+    if (tour & TOUR_WELCOME) {
+        done = 1;
+        if (profile == 1) {
+            PortA11y_Say(tr("Blind player profile on. It is changed in F1, Accessibility."), 0);
+        }
+        return;
+    }
+    if (gDialog != NULL && (gDialog->flags & DIALOG_FLAG_OPEN)) {
+        seen = 1; /* (the memory card's messages first: a heading of theirs would cut the welcome) */
+        quiet = 0;
+        return;
+    }
+    quiet++;
+    if (!(seen && quiet >= 120) && !(gProgress != NULL && gProgress->mode == MODE_TITLE && gTitle != NULL && gTitle->state >= 1) &&
+        sBlank < 1800) {
+        return;
+    }
+    done = 1;
+    sel = PortA11y_ActionName(-1, ACTION_SELECT);
+    start = PortA11y_ActionName(-1, ACTION_START);
+    if (PortA11y_PadFamily(-1) != 0 && sel != NULL && start != NULL) {
+        snprintf(text, sizeof(text), tr("Welcome. This game speaks through your screen reader. %s says the last message again; in a "
+                                        "fight, once says where the rival is, twice your gauges, three times the rival's. F1, or %s "
+                                        "and %s together, opens the settings: their Accessibility tab has the fight's sounds and "
+                                        "their glossary."), sel, sel, start);
+    } else {
+        snprintf(text, sizeof(text), "%s", tr("Welcome. This game speaks through your screen reader. F2 says the last message again; "
+                                              "in a fight, F5 says where the rival is, F3 and F4 the gauges. F1 opens the settings: "
+                                              "their Accessibility tab has the fight's sounds and their glossary."));
+    }
+    PortA11y_Say(text, 0);
+    if (profile == 1) {
+        PortA11y_Say(tr("Blind player profile on. It is changed in F1, Accessibility."), 0);
+    }
+    Port_SettingSave("a11y_tour", tour | TOUR_WELCOME);
+    Port_SettingsWrite();
+    PortA11y_Note(profile == 1 ? "welcome: said, with the profile" : "welcome: said");
+}
+
 /* Once per blank (plat_stub.c: Port_VBlank). */
 void PortA11y_GameTick(void) {
     int v;
@@ -3703,6 +3846,7 @@ void PortA11y_GameTick(void) {
         title();
         main_menu();
     }
+    welcome();
     duel_menu();
     options();
     char_select();
@@ -3727,6 +3871,7 @@ void PortA11y_GameTick(void) {
     shown_text();
     fight_gauges();
     fight_cues();
+    fight_result();
     /* (BATTLE_FLAG_PAUSE: the fight frozen; online a pause menu does not freeze it, and the rival's is not this player's) */
     PortA11y_FightAlerts(fighting() && btl_menu_shown() == NULL && !(gBattleWork.flags & BATTLE_FLAG_PAUSE));
     PortA11y_FightMenu(fighting() && btl_menu_shown() != NULL); /* (a11y.c: Select goes through the sound glossary) */

@@ -568,6 +568,13 @@ static void set_open(bool open) {
     if (open && sChat) {
         chat_close();
     }
+    if (open && A11yUi_Tabs() && !(Port_Setting("a11y_tour", 0) & 2)) {
+        // The first time the window opens with the reader on: on the Accessibility tab, the last of eight, where
+        // the fight's sounds and the blind player profile are (a11y_tour bit 1; the welcome is bit 0, a11y_game.c)
+        sForceTab = 7;
+        Port_SettingSave("a11y_tour", Port_Setting("a11y_tour", 0) | 2);
+        Port_SettingsWrite();
+    }
     sOpen = open;
     sNet = false;
     sCapKind = 0;

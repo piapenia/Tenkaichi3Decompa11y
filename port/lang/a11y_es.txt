@@ -1470,3 +1470,33 @@ d34396444d52cbe2	Dónde está el rival, con un toque de Select en la pelea: el p
 fd463c6a2b602acc	Un ping de sonar apagado
 # The rival is behind you.
 d9cd608ed851aee3	El rival está detrás de ti.
+# K.O.
+a3334adf79500cb5	K.O.
+# Time up
+d0ce63b66bc501d1	Tiempo
+# a draw
+025d8c4706abcaa6	empate
+# you win
+2d6b20b5c13ecc9a	ganas tú
+# the rival wins
+53f3214e2fa90e17	gana el rival
+# you win, with %s
+5592d658cef5513e	ganas tú, con %s
+# the rival wins, %s
+f57ac7e986d10403	gana el rival, %s
+# Result: %s
+f6c804cdd6c25de6	Resultado: %s
+# Blind player profile on. It is changed in F1, Accessibility.
+a8b8bd3e8a1fee44	Perfil para jugar sin ver activado. Se cambia en F1, Accesibilidad.
+# Welcome. This game speaks through your screen reader. %s says the last message again; in a fight, once says where the rival is, twice your gauges, three times the rival's. F1, or %s and %s together, opens the settings: their Accessibility tab has the fight's sounds and their glossary.
+c6c2c5dc93725972	Hola. Este juego habla con tu lector de pantalla. %s repite lo último que se dijo; en la pelea, un toque dice dónde está el rival, dos tus barras y tres las del rival. F1, o %s y %s juntos, abren los ajustes: su pestaña Accesibilidad tiene los sonidos de la pelea y su glosario.
+# Welcome. This game speaks through your screen reader. F2 says the last message again; in a fight, F5 says where the rival is, F3 and F4 the gauges. F1 opens the settings: their Accessibility tab has the fight's sounds and their glossary.
+1b6e8f6944e833f9	Hola. Este juego habla con tu lector de pantalla. F2 repite lo último que se dijo; en la pelea, F5 dice dónde está el rival, y F3 y F4 las barras. F1 abre los ajustes: su pestaña Accesibilidad tiene los sonidos de la pelea y su glosario.
+# Blind player profile: turn on what is recommended
+45914f97abac6f5f	Perfil para jugar sin ver: activar lo recomendado
+# Blind player profile on.
+2ae6ea3bed1aaf19	Perfil para jugar sin ver activado.
+# Distance, edge and health by a sound; the important moments by the screen reader; a transformation, the\nUltimate Blast and the gauges on request by both; the cues at 85 and the music in fights at 70. Each one\ncan be changed below afterwards. With NVDA or JAWS this is done by itself the first time.
+686bcb5a26d63c6c	Distancia, borde y vida con sonido; los momentos importantes con el lector de pantalla; la transformación, el ataque definitivo y el estado a pedido con los dos; los avisos al 85 y la música en la pelea al 70. Cada uno se puede cambiar después aquí abajo. Con NVDA o JAWS esto se hace solo la primera vez.
+# In the game, F1 opens the settings: their Accessibility tab has the fight's sounds and the blind player profile, which is turned on by itself with NVDA or JAWS.
+932dbc406cdc5dab	En el juego, F1 abre los ajustes: su pestaña Accesibilidad tiene los sonidos de la pelea y el perfil para jugar sin ver, que se activa solo con NVDA o JAWS.

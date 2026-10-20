@@ -41,6 +41,7 @@ int PortA11y_Voices(int fight); // a11y_game.c
 void PortA11y_SetVoices(int fight, int percent);
 int PortA11y_FightMusic(void);
 void PortA11y_SetFightMusic(int percent);
+void PortA11y_ApplyProfile(void); // a11y_fight.c: the blind player profile
 void Port_SettingsWrite(void); // plat_settings.c
 void Ui_Toggle(void); // ui.cpp: opens or closes the window (F1)
 const char *PortA11y_PadSourceName(int src); // a11y_pad.c: a controller button by the name of the one in use
@@ -1667,6 +1668,15 @@ void A11yUi_Tab(void) {
     int v;
 
     ImGui::TextWrapped("%s", shown("Sounds and voices of the accessibility. The screen reader keeps its own volume: see the last button."));
+    ImGui::Spacing();
+    // The blind player profile first (a11y_fight.c): what is recommended for playing without seeing, at once
+    if (ImGui::Button(label_id("Blind player profile: turn on what is recommended"))) {
+        PortA11y_ApplyProfile();
+        PortA11y_Say(shown("Blind player profile on."), A11Y_INTERRUPT);
+    }
+    tab_tip("Distance, edge and health by a sound; the important moments by the screen reader; a transformation, the\n"
+            "Ultimate Blast and the gauges on request by both; the cues at 85 and the music in fights at 70. Each one\n"
+            "can be changed below afterwards. With NVDA or JAWS this is done by itself the first time.");
     ImGui::Spacing();
     v = PortA11y_CueVolume();
     if (tab_slider("Cue sounds", &v, 0, 100, "%d%%")) {

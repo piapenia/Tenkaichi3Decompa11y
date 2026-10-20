@@ -825,7 +825,11 @@ static void page_changed(Page from) {
         }
         Voice_Say(Voice_Tr(from == PAGE_RUN ? "Ready: the game is installed. It opens now."
                                             : "The game is installed already. It opens now; Escape stays here."), true);
-        sAutoPlayAt = SDL_GetTicks() + (from == PAGE_RUN ? 2500 : 4000);
+        if (from == PAGE_RUN) { // (the first time: where the accessibility is, before the game's own welcome)
+            Voice_Say(Voice_Tr("In the game, F1 opens the settings: their Accessibility tab has the fight's sounds and the "
+                               "blind player profile, which is turned on by itself with NVDA or JAWS."), false);
+        }
+        sAutoPlayAt = SDL_GetTicks() + (from == PAGE_RUN ? 9000 : 4000);
     } else if (sPage == PAGE_FAILED) {
         if (disc_failed() && !sStopAsked) {
             // the more an error says the image is the game's (its programs changed, then cut short, then another

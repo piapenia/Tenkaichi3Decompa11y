@@ -182,6 +182,13 @@ static PrismBackend *try_backend(PrismContext *ctx, uint64_t id) {
     return b;
 }
 
+/* Which screen reader speaks (PortA11y_ReaderKind): -1 not known yet, then READER_. */
+#define READER_NONE 0
+#define READER_NVDA 1
+#define READER_JAWS 2
+#define READER_OTHER 3 /* another one, or a voice of the system's (SAPI and the like) */
+static SDL_AtomicInt sReaderKind = {-1};
+
 static PrismBackend *choose_backend(PrismContext *ctx) {
     static const uint64_t first[] = {PRISM_NVDA, PRISM_JAWS};
     PrismBackend *b;
@@ -191,6 +198,7 @@ static PrismBackend *choose_backend(PrismContext *ctx) {
     for (i = 0; i < 2; i++) {
         if ((b = try_backend(ctx, first[i])) != NULL) {
             fprintf(stderr, "a11y: speaking through %s\n", P.name(ctx, first[i]));
+            SDL_SetAtomicInt(&sReaderKind, i == 0 ? READER_NVDA : READER_JAWS);
             return b;
         }
     }
@@ -198,11 +206,31 @@ static PrismBackend *choose_backend(PrismContext *ctx) {
         id = P.id_at(ctx, i);
         if (id != PRISM_NVDA && id != PRISM_JAWS && (b = try_backend(ctx, id)) != NULL) {
             fprintf(stderr, "a11y: speaking through %s\n", P.name(ctx, id));
+            SDL_SetAtomicInt(&sReaderKind, READER_OTHER);
             return b;
         }
     }
     fprintf(stderr, "a11y: no screen reader or voice started\n");
+    SDL_SetAtomicInt(&sReaderKind, READER_NONE);
     return NULL;
+}
+
+/* For a11y_fight.c (the blind player profile, applied the first time NVDA or JAWS speaks): which screen reader
+   speaks, READER_*, or -1 while the speaker is still choosing. $BT3_A11Y_READER (tests: "nvda", "jaws", another
+   word for another reader) says it without one. */
+int PortA11y_ReaderKind(void) {
+    static int test = -2;
+
+    if (test == -2) {
+        const char *r = getenv("BT3_A11Y_READER");
+        test = r == NULL ? -1 : SDL_strcasecmp(r, "nvda") == 0 ? READER_NVDA : SDL_strcasecmp(r, "jaws") == 0 ? READER_JAWS : READER_OTHER;
+    }
+    return test >= 0 ? test : SDL_GetAtomicInt(&sReaderKind);
+}
+
+/* Its name, for the log. */
+const char *PortA11y_ReaderName(int kind) {
+    return kind == READER_NVDA ? "NVDA" : kind == READER_JAWS ? "JAWS" : kind == READER_OTHER ? "another reader or voice" : "none";
 }
 
 /* ---- the speaker ---- */
@@ -259,6 +287,9 @@ static int SDLCALL speaker(void *unused) {
         fprintf(stderr, "a11y: prism config version %u (written against Prism 0.18.3)\n", (unsigned)cfg.v0_18_3.version);
         ctx = P.init(&cfg);
         b = ctx != NULL ? choose_backend(ctx) : NULL;
+    }
+    if (b == NULL) {
+        SDL_SetAtomicInt(&sReaderKind, READER_NONE); /* (no library, a log only; or nothing started) */
     }
     for (;;) {
         SDL_LockMutex(sLock);

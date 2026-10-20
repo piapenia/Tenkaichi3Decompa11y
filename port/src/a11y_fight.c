@@ -158,6 +158,73 @@ void PortA11y_SetAlertMode(int alert, int value) {
     }
 }
 
+/* ---- the blind player profile ----
+ *
+ * What is recommended for playing without seeing (the audit of 2026-10-17, plan V6.1): distance, edge and health by
+ * sound; the important moments by the screen reader; a transformation and the Ultimate Blast, and the gauges on
+ * request, by both; the cues at 85 %; the music in fights at 70 % (about 3 dB under). The rest as it is by default.
+ * The Accessibility tab's first button applies it; and it is applied by itself once, the first time NVDA or JAWS
+ * speaks, unless the alerts or the cues' volume were set by hand before (bt3_settings.txt has one of them): the
+ * setting a11y_profile is 1 once it was applied, 0 when it was not because of those. With another reader or a voice
+ * of the system's nothing is written, so that a later run with NVDA or JAWS still applies it. */
+#define NOT_SET (-12345)
+extern int PortA11y_ReaderKind(void); /* gs/a11y.c: -1 not known yet, 1 NVDA, 2 JAWS */
+extern const char *PortA11y_ReaderName(int kind);
+extern void PortA11y_SetCueVolume(int percent);
+extern void PortA11y_SetFightMusic(int percent); /* a11y_game.c */
+extern void Port_SettingsWrite(void);
+static int sProfile = -1; /* this run: -1 not decided yet, 0 not applied by itself, 1 applied by itself */
+
+void PortA11y_ApplyProfile(void) {
+    static const int kProfile[ALERTS] = {BY_SOUND, BY_SOUND, BY_SOUND, BY_SOUND | BY_VOICE, BY_SOUND | BY_VOICE, BY_VOICE, BY_VOICE, BY_VOICE};
+    int i;
+
+    for (i = 0; i < ALERTS; i++) {
+        PortA11y_SetAlertMode(i, kProfile[i]);
+    }
+    PortA11y_SetCueVolume(85);
+    PortA11y_SetFightMusic(70);
+    Port_SettingSave("a11y_profile", 1);
+    Port_SettingsWrite();
+}
+
+/* Once per blank from a11y_game.c, until it is decided: the profile by itself, the first time. Returns this run's
+   decision as above (-1 while the reader is not known). */
+int PortA11y_ProfileTick(void) {
+    char note[128];
+    int kind, i, byHand = 0;
+
+    if (sProfile >= 0 || (kind = PortA11y_ReaderKind()) < 0) {
+        return sProfile;
+    }
+    sProfile = 0;
+    if ((i = Port_Setting("a11y_profile", NOT_SET)) != NOT_SET) {
+        snprintf(note, sizeof(note), "profile: decided before (a11y_profile=%d)", i);
+        PortA11y_Note(note);
+        return sProfile;
+    }
+    for (i = 0; i < ALERTS; i++) {
+        byHand |= Port_Setting(kKeys[i], NOT_SET) != NOT_SET;
+    }
+    byHand |= Port_Setting("a11y_cue_volume", NOT_SET) != NOT_SET;
+    if (byHand) {
+        Port_SettingSave("a11y_profile", 0);
+        Port_SettingsWrite();
+        PortA11y_Note("profile: not applied (the alerts were set by hand)");
+        return sProfile;
+    }
+    if (kind != 1 && kind != 2) {
+        snprintf(note, sizeof(note), "profile: not applied (reader: %s)", PortA11y_ReaderName(kind));
+        PortA11y_Note(note);
+        return sProfile;
+    }
+    PortA11y_ApplyProfile();
+    sProfile = 1;
+    snprintf(note, sizeof(note), "profile: blind player applied (reader %s)", PortA11y_ReaderName(kind));
+    PortA11y_Note(note);
+    return sProfile;
+}
+
 static int sBlank; /* blanks of fights told so far */
 
 /* The side whose alerts these are: online the side this copy plays; else player 1's. */
@@ -490,6 +557,15 @@ static void health(int me) {
 #define KI_BAR 20000          /* ki per bar, five bars (a11y_game.c GAUGE_KI_BAR) */
 #define KI_FULL (5 * KI_BAR)
 
+/* The log's note of a moment said (port/tools/a11y_check.py: the moments noted are the moments said, none of them
+   dropped by a technique's name). */
+static void moment_note(const char *text) {
+    char note[192];
+
+    snprintf(note, sizeof(note), "moment: %s", text);
+    PortA11y_Note(note);
+}
+
 /* For each player: health down to two bars and then to one, ki full (said again only after it fell under four bars),
    max power. A new fighter (a team's next member, a transformation, the next fight) is taken as it is, unsaid. */
 static void moments(void) {
@@ -522,6 +598,7 @@ static void moments(void) {
                 snprintf(text, sizeof(text), now == 2 ? tr("Player %d: 2 bars of health left") : tr("Player %d: 1 bar of health left"),
                          side + 1);
                 PortA11y_Say(text, 0);
+                moment_note(text);
             }
         }
         if (full && !kiFull[side]) {
@@ -531,6 +608,7 @@ static void moments(void) {
             if (m & BY_VOICE) {
                 snprintf(text, sizeof(text), tr("Player %d: ki full"), side + 1);
                 PortA11y_Say(text, 0);
+                moment_note(text);
             }
         }
         if (up && !power[side]) {
@@ -540,6 +618,7 @@ static void moments(void) {
             if (m & BY_VOICE) {
                 snprintf(text, sizeof(text), tr("Player %d: max power"), side + 1);
                 PortA11y_Say(text, 0);
+                moment_note(text);
             }
         }
         bars[side] = now;
@@ -564,11 +643,13 @@ void PortA11y_FightAlerts(int fight) {
         return;
     }
     if (!was) {
-        char note[160];
+        char note[224];
         was = 1;
         sBlank += 600; /* (whatever was waiting from the last fight is due) */
-        snprintf(note, sizeof(note), "fight alerts: distance %d, edge %d, health %d, moments %d, power %d (0 off, 1 sound, 2 voice, 3 both)",
-                 mode(ALERT_DISTANCE), mode(ALERT_EDGE), mode(ALERT_HEALTH), mode(ALERT_MOMENTS), mode(ALERT_POWER));
+        extern int PortA11y_CueVolume(void), PortA11y_FightMusic(void); /* gs/a11y.c, a11y_game.c */
+        snprintf(note, sizeof(note), "fight alerts: distance %d, edge %d, health %d, moments %d, power %d, gauges %d (0 off, 1 sound, "
+                 "2 voice, 3 both); cues %d %%, music in fights %d %%", mode(ALERT_DISTANCE), mode(ALERT_EDGE), mode(ALERT_HEALTH),
+                 mode(ALERT_MOMENTS), mode(ALERT_POWER), mode(ALERT_GAUGES), PortA11y_CueVolume(), PortA11y_FightMusic());
         PortA11y_Note(note);
     }
     sBlank++;

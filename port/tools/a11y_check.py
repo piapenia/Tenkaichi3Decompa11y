@@ -158,7 +158,7 @@ def read_log(path):
 
 def log_profile(log, on):
     notes = [t for b, k, t in log if k == "#" and t.startswith("profile:")]
-    applied = [t for t in notes if "applied" in t]
+    applied = [t for t in notes if "blind player applied" in t]
     if on:
         check(len(applied) == 1, "el perfil para jugar sin ver se aplicó %d vez/veces" % len(applied), "una sola vez")
         said = [t for b, k, t in log if k != "#" and ("Perfil para jugar sin ver" in t or "Blind player profile" in t)]
@@ -205,17 +205,27 @@ def log_where(log):
     check(bad_side == 0, "en %d preguntas, el lado dicho coincide con el signo del ángulo" % n, "todas, y fallan %d" % bad_side)
     check(bad_behind == 0, "detrás se dice solo por encima de 100 grados", "todas bien, y fallan %d" % bad_behind)
     check(bad_height == 0, "arriba y abajo coinciden con la elevación", "todas bien, y fallan %d" % bad_height)
-    locks = [t for b, k, t in log if k == "#" and t.startswith("where: sign test")]
-    for t in locks[-1:]:
-        m = re.search(r"median \|az\| (\d+) over (\d+)", t)
-        if m:
-            check(int(m.group(1)) < 15, "con la fijación puesta, el ángulo medio al rival es %s grados (%s cuadros)" % m.groups(), "menos de 15")
+    tests = [re.search(r"median \|az\| (\d+) over (\d+)", t) for b, k, t in log if k == "#" and t.startswith("where: sign test")]
+    tests = [(int(m.group(1)), int(m.group(2))) for m in tests if m]
+    if tests:
+        check(all(med < 15 for med, n in tests), "prueba de signo: con la fijación puesta, el ángulo medio al rival es de %s grados en %d tramos de pelea (%d cuadros)" % (
+            " y ".join(sorted(set(str(med) for med, n in tests))), len(tests), sum(n for med, n in tests)), "menos de 15 en todas")
+    else:
+        fail("el registro no tiene la prueba de signo", "una por pelea con la fijación puesta")
 
 
 def log_winner(log):
+    # each winner noted is said right after
+    wins = [(i, b, t) for i, (b, k, t) in enumerate(log) if k == "#" and t.startswith("winner:")]
+    for i, b, t in wins:
+        said = [t2 for b2, k2, t2 in log[i + 1:i + 6] if k2 != "#" and b2 - b < 120]
+        print("dato: %d %s; dicho: %s" % (b, t, said[0] if said else "nada"))
+    unsaid = [w for w in wins if not any(k2 != "#" for b2, k2, t2 in log[w[0] + 1:w[0] + 6] if b2 - w[1] < 120)]
+    if wins:
+        check(not unsaid, "los %d ganadores anotados se dijeron" % len(wins), "todos, y faltan %d" % len(unsaid))
     overs = [i for i, (b, k, t) in enumerate(log) if k != "#" and t in ("Fight over", "Fin de la pelea")]
     if not overs:
-        fail("el registro no tiene ningún final de pelea", "al menos uno")
+        (print if wins else lambda t: fail(t, "al menos uno"))("dato: el registro no tiene el menú de fin de pelea" if wins else "el registro no tiene ningún final de pelea")
         return
     missing = 0
     for i in overs:
@@ -227,15 +237,30 @@ def log_winner(log):
 def log_names(log):
     names = [(b, k, t) for b, k, t in log if k == "#" and t.startswith("technique name:")]
     if not names:
-        print("dato: el registro no tiene nombres de técnicas en una pelea")
-        return
-    said = [b for b, k, t in names if "said" in t]
-    gaps = [b - a for a, b in zip(said, said[1:])]
-    check(all(g >= 90 for g in gaps), "%d nombres de técnicas dichos, separados al menos 1,5 s" % len(said),
-          "1,5 s o más, y el menor fue %s s" % num(min(gaps) / 60) if gaps else "")
-    moments = [t for b, k, t in log if k == "#" and t.startswith("moment:")]
-    told = [t for b, k, t in log if k != "#" and re.search(r"(barras? de vida|ki lleno|máximo poder|bars? of health|ki full|max power)", t)]
-    check(len(told) >= len(moments), "los %d momentos importantes anotados se dijeron (%d dichos)" % (len(moments), len(told)), "los mismos")
+        print("dato: el registro no tiene nombres de técnicas en una pelea (las peleas de demostración no los muestran)")
+    else:
+        said = [(i, b) for i, (b, k, t) in enumerate(log) if k == "#" and t.startswith("technique name: said")]
+        gaps = [b - a for (_, a), (_, b) in zip(said, said[1:])]
+        dropped = len(names) - len(said)
+        check(all(g >= 90 for g in gaps), "%d nombres de técnicas dichos (%d dejados por llegar antes de 1,5 s), separados al menos 1,5 s" % (
+            len(said), dropped), "1,5 s o más, y el menor fue %s s" % num(min(gaps) / 60) if gaps else "")
+        # a name said is queued: the line goes to the log with "+" (an interrupting one has none)
+        queued = []
+        for i, b in said:
+            text = log[i][2].split(": ", 2)[2]
+            queued += [k2 == "+" for b2, k2, t2 in log[i + 1:i + 200] if k2 != "#" and t2 == text][:1]
+        check(queued and all(queued), "los %d nombres dichos van en cola, sin cortar lo que se está diciendo" % len(queued), "todos en cola")
+    # every moment noted is said after it (the speaker writes a line when it says it: one dropped from the queue by
+    # an interrupting line is not in the log)
+    lost = []
+    for i, (b, k, t) in enumerate(log):
+        if k == "#" and t.startswith("moment: "):
+            text = t[len("moment: "):]
+            if not any(k2 != "#" and t2 == text for b2, k2, t2 in log[i + 1:i + 200] if b2 - b < 600):
+                lost.append("%d %s" % (b, text))
+    n = len([1 for b, k, t in log if k == "#" and t.startswith("moment: ")])
+    check(n > 0 and not lost, "los %d momentos importantes anotados se dijeron todos" % n,
+          "todos, y se perdieron %d: %s" % (len(lost), "; ".join(lost[:5])) if n else "al menos uno en la prueba")
 
 
 def log(path, what="all"):
@@ -345,7 +370,7 @@ def c_strings(text, tables=False):
     """The labels passed to the translation calls of a C file, with their literals joined."""
     lit = r'((?:"(?:[^"\\\n]|\\.)*"\s*)+)'
     found = []
-    for m in re.finditer(r'\b(?:tr|PortA11y_Tr|shown|label_id|lang_line|tab_slider|tab_tip)\(\s*' + lit, text):
+    for m in re.finditer(r'\b(?:tr|PortA11y_Tr|shown|label_id|lang_line|tab_slider|tab_tip|Voice_Tr)\(\s*' + lit, text):
         found.append(m.group(1))
     for m in re.finditer(r'\b(?:trc|PortA11y_TrSense)\(\s*(?:NULL|"[^"]*")\s*,\s*' + lit, text):
         found.append(m.group(1))
@@ -379,7 +404,8 @@ def lang(path=None, sources=None):
     check(not wrong, "cada línea del archivo en español tiene la clave de su inglés", "todas, y no la tienen: " + " | ".join(wrong[:5]))
     sources = sources or [os.path.join(ROOT, p) for p in (
         "port/src/a11y_game.c", "port/src/a11y_fight.c", "port/src/a11y_skills.c", "port/src/a11y_text.c",
-        "port/src/gs/a11y.c", "port/src/gs/a11y_glossary.c", "port/src/gs/a11y_pad.c", "port/src/gs/a11y_ui.cpp")]
+        "port/src/gs/a11y.c", "port/src/gs/a11y_glossary.c", "port/src/gs/a11y_pad.c", "port/src/gs/a11y_ui.cpp",
+        "port/setup/setup.cpp")]
     missing, seen = [], 0
     for src in sources:
         for s in c_strings(open(src, encoding="utf-8").read(), os.path.basename(src) in ("a11y_glossary.c", "a11y_ui.cpp")):
