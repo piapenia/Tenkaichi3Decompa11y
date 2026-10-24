@@ -7,7 +7,8 @@
 # and "(tar.gz)"); the notes say that is not what is played. A tag with -test or -rc in it is published as a
 # pre-release. The Linux archive (no screen reader there yet) is kept as the run's artifact only.
 #
-#   a tag v*-a11y*            build, then publish (or, when the tag already has a release, replace its archive)
+#   a tag v*-a11y*            build, then publish (or, when the tag already has a release, replace its archive and
+#                             keep its notes)
 #   "Run workflow" button     the same for a tag that exists (its name asked for): to build a release again
 name: accessible release
 
@@ -94,8 +95,9 @@ jobs:
           pre=""
           case "$TAG" in *-test*|*-rc*) pre="--prerelease" ;; esac
           if gh release view "$TAG" >/dev/null 2>&1; then
+            # (a release made by hand first, with its notes: they stay; only the archive is this build's)
             gh release upload "$TAG" "$zip" --clobber
-            gh release edit "$TAG" --draft=false --notes-file notes.md $pre
+            gh release edit "$TAG" --draft=false $pre
           else
             gh release create "$TAG" "$zip" --title "Tenkaichi 3 accesible ${TAG#v}" --notes-file notes.md $pre
           fi
