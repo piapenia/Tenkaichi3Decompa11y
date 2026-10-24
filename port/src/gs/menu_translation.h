@@ -25,13 +25,13 @@ int MenuTranslation_List(const char *outDir, MenuTranslationOption *out, int cap
 int MenuTranslation_Available(MenuTranslationOption *out, int capacity);
 int MenuTranslation_ShouldPrompt(const MenuTranslationOption *options, int count);
 int MenuTranslation_BootPending(void);
-/* Optional first-run language screen artwork. Returns its PNG path when present. */
-int MenuTranslation_ArtPath(int artId, char *out, size_t capacity);
 void MenuTranslation_SaveChoice(const char *locale);
 const char *MenuTranslation_Locale(void);
 const char *MenuTranslation_Text(const char *id);
 /* Port-owned UI text, decoded from translations/port/<locale>.json; NULL uses the built-in English string. */
 const char *MenuTranslation_PortText(const char *id);
+/* A line of the online menus in the chosen language (ids "tbo/..." of that file, looked up by their English); NULL: as it is. */
+const char *MenuTranslation_Line(const char *original);
 const char *MenuTranslation_Original(const char *id);
 const char *MenuTranslation_Group(const char *id);
 const char *const *MenuTranslation_StageNames(void); /* 36 entries */
