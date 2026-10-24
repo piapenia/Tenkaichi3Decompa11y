@@ -1052,6 +1052,9 @@ static void vk_frame_end(void) {
         if (ev.type == SDL_EVENT_QUIT) {
             exit(0);
         }
+        if (PortInput_Echo(&ev)) { /* a key a program sent with a controller's press (Circle as Escape): not the game's */
+            continue;
+        }
         { extern void PortA11y_Event(const SDL_Event *ev); PortA11y_Event(&ev); } /* a11y.c: the repeat key and button */
         if (PortInput_Hotkey(&ev)) { /* F1, START + SELECT, or what the settings window's list says */
             Ui_Toggle();

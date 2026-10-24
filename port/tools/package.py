@@ -17,6 +17,7 @@ Contents:  Tenkaichi3Decomp, Tenkaichi3Decomp.dat   the game without the data ta
            translations/ui/       optional bundled game UI catalogs
            translations/port/     text added by the PC port
            tbo/ui/         the pictures of the Tenkaichi Budokai Online screens (port/tbo/ui), their credits in licenses/
+           gamecontrollerdb.txt   the community's controller mappings, a fixed version (port/release/Dockerfile)
            README.txt, licenses/
 The user needs nothing but their disc image. Nothing from the disc is in the zip."""
 import hashlib, os, pathlib, re, shutil, subprocess, sys, zipfile
@@ -198,6 +199,24 @@ def take_prism(out, lic):
     for p in sorted((ROOT / "port/release/a11y").glob("*.txt")):
         (out / p.name).write_text(p.read_text(encoding="utf-8").replace("\n", "\r\n"), encoding="utf-8")
 
+def take_gamecontrollerdb(out, lic):
+    """The community's controller mappings (github.com/mdqinc/SDL_GameControllerDB, zlib licence), which the program
+    reads from beside itself as the controllers start (port/src/gs/gs_input.c): $BT3_GAMECONTROLLERDB names a folder
+    with gamecontrollerdb.txt, LICENSE and COMMIT, as port/release/Dockerfile makes it at a fixed commit. Without it the
+    release has only SDL's own mappings, and says so here. The player's own gamecontrollerdb_own.txt is never shipped."""
+    given = os.environ.get("BT3_GAMECONTROLLERDB")
+    src = pathlib.Path(given) if given else None
+    if src is None or not (src / "gamecontrollerdb.txt").is_file() or not (src / "LICENSE").is_file():
+        print("gamecontrollerdb.txt: not packaged (BT3_GAMECONTROLLERDB names no folder with it and its LICENSE): "
+              "only SDL's own controller mappings")
+        return
+    shutil.copy2(src / "gamecontrollerdb.txt", out / "gamecontrollerdb.txt")
+    commit = (src / "COMMIT").read_text().strip() if (src / "COMMIT").is_file() else "unknown"
+    (lic / "sdl-gamecontrollerdb.txt").write_text(
+        "gamecontrollerdb.txt is the SDL_GameControllerDB of https://github.com/mdqinc/SDL_GameControllerDB, commit "
+        f"{commit}, under this licence:\n\n" + (src / "LICENSE").read_text(encoding="utf-8"))
+    print(f"gamecontrollerdb.txt: SDL_GameControllerDB {commit[:12]}")
+
 def take_translations(out):
     """Bundled label, UI, and port-text catalogs."""
     target = out / "translations"
@@ -286,6 +305,7 @@ def main_win():
     take_fonts(out, lic)
     take_tbo_art(out, lic)
     take_prism(out, lic)
+    take_gamecontrollerdb(out, lic)
     (out / "textures").mkdir()
     (out / "textures/README.txt").write_text(TEXTURES_NOTE.replace("\n", "\r\n"))
     for kind, note in (("stages", STAGES_NOTE), ("songs", SONGS_NOTE)):
@@ -334,6 +354,7 @@ def main():
 
     take_fonts(OUT, lic)
     take_tbo_art(OUT, lic)
+    take_gamecontrollerdb(OUT, lic)
     (OUT / "textures").mkdir()
     (OUT / "textures/README.txt").write_text(TEXTURES_NOTE)
     for kind, note in (("stages", STAGES_NOTE), ("songs", SONGS_NOTE)):

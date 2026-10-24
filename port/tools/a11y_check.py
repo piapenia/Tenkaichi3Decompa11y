@@ -374,6 +374,15 @@ def c_strings(text, tables=False):
         found.append(m.group(1))
     for m in re.finditer(r'\b(?:trc|PortA11y_TrSense)\(\s*(?:NULL|"[^"]*")\s*,\s*' + lit, text):
         found.append(m.group(1))
+    # gs/gs_input.c: what is said of the controllers (say_add, learn_say, learn_stop) and the setup's parts (kLearn)
+    for m in re.finditer(r'\bsay_add\(\s*\w+\s*,\s*sizeof\(\w+\)\s*,\s*' + lit, text):
+        found.append(m.group(1))
+    for m in re.finditer(r'\blearn_say\(\s*[^,()]+\s*,\s*' + lit, text):
+        found.append(m.group(1))
+    for m in re.finditer(r'\blearn_stop\(\s*' + lit, text):
+        found.append(m.group(1))
+    for m in re.finditer(r'\{\s*"[a-z]+"\s*,\s*' + lit + r',\s*' + lit + r',\s*L_', text):
+        found.extend([m.group(1), m.group(2)])
     # tables whose texts are said through a variable: the glossary's {"name", "meaning", ...} and the settings
     # window's {"label", "tip"} entries
     for m in re.finditer(r'\{\s*' + lit + r',\s*' + lit + r'(?=,|\})', text) if tables else ():
@@ -405,7 +414,7 @@ def lang(path=None, sources=None):
     sources = sources or [os.path.join(ROOT, p) for p in (
         "port/src/a11y_game.c", "port/src/a11y_fight.c", "port/src/a11y_skills.c", "port/src/a11y_text.c",
         "port/src/gs/a11y.c", "port/src/gs/a11y_glossary.c", "port/src/gs/a11y_pad.c", "port/src/gs/a11y_ui.cpp",
-        "port/setup/setup.cpp")]
+        "port/src/gs/gs_input.c", "port/setup/setup.cpp")]
     missing, seen = [], 0
     for src in sources:
         for s in c_strings(open(src, encoding="utf-8").read(), os.path.basename(src) in ("a11y_glossary.c", "a11y_ui.cpp")):

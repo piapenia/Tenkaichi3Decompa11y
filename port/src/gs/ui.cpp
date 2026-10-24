@@ -1171,6 +1171,17 @@ int Ui_Event(const SDL_Event *ev) {
     if (!sOpen && !sQuit && !sChat && PortInput_TboEvent(ev)) { // typed on a keypad of Tenkaichi Budokai Online
         return 1;
     }
+    if (PortInput_Learning()) { // a controller is being set up (gs_input.c): Escape stops it; its presses are its own
+        if (ev->type == SDL_EVENT_KEY_DOWN && ev->key.scancode == SDL_SCANCODE_ESCAPE) {
+            if (!ev->key.repeat) {
+                PortInput_LearnStop();
+            }
+            return 1;
+        }
+        if (ev->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || ev->type == SDL_EVENT_GAMEPAD_BUTTON_UP || ev->type == SDL_EVENT_GAMEPAD_AXIS_MOTION) {
+            return 1;
+        }
+    }
     if (sQuit && PortQuit_Active()) { // game dialog: keyboard and controller operate its native Yes / No plates
         if (ev->type == SDL_EVENT_KEY_DOWN && !ev->key.repeat) {
             SDL_Scancode key = ev->key.scancode;
@@ -1936,6 +1947,21 @@ static void controls_tab(void) {
         PortInput_ResetDefaults(player);
         PortInput_Save();
     }
+    // A controller the game does not know, or knows wrongly: its parts asked for one by one, by voice (gs_input.c)
+    if (ImGui::Button(PortInput_Learning() ? "Stop setting up (Esc)###learn" : "Set up a controller###learn")) { // (one id: the focus stays)
+        if (PortInput_Learning()) {
+            PortInput_LearnStop();
+        } else {
+            PortInput_LearnStart();
+        }
+    }
+    ImGui::SetItemTooltip("For a controller whose buttons do not work, or do not do what they say: press any button on it,\n"
+                          "then each button and stick as the screen reader (and this line) asks for it. A part it does not\n"
+                          "have: wait ten seconds. Kept in gamecontrollerdb_own.txt for the next times.");
+    if (PortInput_LearnStatus()[0] != '\0') {
+        ImGui::SameLine();
+        ImGui::TextWrapped("%s", PortInput_LearnStatus());
+    }
     if (ImGui::CollapsingHeader("Sticks, triggers and vibration", ImGuiTreeNodeFlags_DefaultOpen)) {
         sticks_panel(player);
     }
@@ -2143,10 +2169,19 @@ void Ui_DrawAgain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target) {
 static char sNotice[160];
 static Uint64 sNoticeUntil;
 static volatile int sNoticeNew;
+static volatile int sNoticeQuiet; // the screen reader does not read it (a11y_ui.cpp reads the window "##notice" only)
 
 extern "C" void Port_UiNotice(const char *text) {
     SDL_strlcpy(sNotice, text != NULL ? text : "", sizeof(sNotice));
+    sNoticeQuiet = 0;
     sNoticeNew = 1;
+}
+
+// The same for a notice whose news the screen reader gives once elsewhere (gs/net.c: the rival found while training,
+// which the match's banner says with the rival's name).
+extern "C" void Port_UiNoticeQuiet(const char *text) {
+    Port_UiNotice(text);
+    sNoticeQuiet = 1;
 }
 
 // A line in the middle of the screen, the picture behind it dimmed, while the game's thread waits inside a blank
@@ -2154,10 +2189,10 @@ extern "C" void Port_UiNotice(const char *text) {
 // wait is over; the line stays that long more, over the game's own pictures and without the dimming. NULL: gone.
 static char sBanner[256];
 static Uint64 sBannerUntil; // 0: while the game waits
-extern "C" void Port_UiBanner(const char *text, int ms) {
+static void banner(const char *text, const char *said, int ms) {
     if (text != NULL) {
         if (strcmp(sBanner, text) != 0) { // (said once per line: the game's thread calls this again while it waits)
-            PortA11y_Say(text, 1);
+            PortA11y_Say(said, 1);
         }
         SDL_strlcpy(sBanner, text, sizeof(sBanner));
     }
@@ -2167,6 +2202,16 @@ extern "C" void Port_UiBanner(const char *text, int ms) {
     sBannerUntil = ms > 0 ? SDL_GetTicks() + (Uint64)ms : 0;
 }
 
+// The line said in the screen reader's language (port/lang/a11y_<code>.txt).
+extern "C" void Port_UiBanner(const char *text, int ms) {
+    banner(text, text != NULL ? PortA11y_Label(text) : NULL, ms);
+}
+
+// A line with a name in it: what the screen reader says, made by the caller in the reader's language.
+extern "C" void Port_UiBannerSaid(const char *text, const char *said) {
+    banner(text, said, 0);
+}
+
 // The save icon (quick saving, src/sys/mcflow_a.c): a small memory card in the bottom right corner of the picture
 // while the game saves, at least a second, then it fades. Set from the game's thread: 1 saving, 0 saved, -1 the
 // game's own window took over (an error: the icon goes at once).
@@ -2174,6 +2219,11 @@ static volatile int sSaving;
 static Uint64 sSaveFrom, sSaveEnd; // (0: not shown; the end, 0 while it saves)
 extern "C" void Port_UiSaving(int state) {
     sSaving = state;
+}
+
+// The save loaded at start by quick saving, which shows no page: said, as "Load successful" was read from it.
+extern "C" void Port_UiLoaded(void) {
+    PortA11y_Say(PortA11y_Label("Save loaded"), 0);
 }
 
 static bool save_icon_on(Uint64 now) {
@@ -2613,8 +2663,8 @@ static bool frame_build(void) {
         sPadHold = held;
     }
     // (the button that becomes the binding would also press the row it is bound in; while a chat line is typed the
-    // controller is the game's)
-    if (sPadHold || (sChat && !sOpen)) {
+    // controller is the game's; while a controller is set up, its presses are the setup's)
+    if (sPadHold || (sChat && !sOpen) || PortInput_Learning()) {
         ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
     } else {
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
@@ -2713,7 +2763,7 @@ static bool frame_build(void) {
         ImGuiIO &io = ImGui::GetIO();
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.12f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowBgAlpha(0.85f);
-        if (ImGui::Begin("##notice", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs |
+        if (ImGui::Begin(sNoticeQuiet ? "##notice-said" : "##notice", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs |
                                                ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoSavedSettings)) {
             ImGui::TextUnformatted(sNotice);
         }

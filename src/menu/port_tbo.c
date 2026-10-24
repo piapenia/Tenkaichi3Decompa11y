@@ -1590,19 +1590,35 @@ static void Tb_KeyFocus(char *out, s32 rows, char (*keys)[KEY_COLS + 1], const T
     }
 }
 
+/* For the screen reader's reading of the game's box (port/src/a11y_game.c, msg_window): 1 while the box's line is
+   not to be read, for it is said once elsewhere: the rival found ("Here we go!"), which the match's banner says with
+   the rival's name (gs/net.c, session_banner). */
+s32 PortTbo_BoxQuiet(void) {
+    return sTb != NULL && sTb->mode == TB_WAIT && sTb->found;
+}
+
 /* Once a frame, after the page's update. */
+extern void PortA11y_TboPrompt(int kind, const char *label); /* gs/a11y_pad.c: a button at the page's foot, to say */
+extern void PortA11y_TboPromptsSay(int typing);                /* ... and all of them, with the controller's names */
+
 static void Tb_Speak(void) {
     static s32 mode = -1;
+    static s32 prompts = -1; /* how many of the page's buttons were said (-1: due, once the page has set its own) */
     static char said[160];
     static char typed[40];
     static s32 noted;
     char focus[160];
     char part[64];
     char now[40];
+    char *plabel;
+    s32 changed = 0;
+    s32 count;
+    s32 pk;
 
     if (sTb->frames == 0) { /* (the screens opened again) */
         mode = -1;
         typed[0] = 0;
+        prompts = -1;
     }
     focus[0] = 0;
     now[0] = 0;
@@ -1643,7 +1659,7 @@ static void Tb_Speak(void) {
         break;
     case TB_WAIT:
         if (sTb->found) {
-            Ps_Copy(focus, "Your rival is here! The match begins.", 160);
+            Ps_Copy(focus, said, 160); /* (nothing new: the match's banner says the rival is there, with the name) */
         } else if (sTb->host == 2) {
             Ps_Copy(focus, sTb->queue ? "Quick match, teams: searching" : "Quick match, one on one: searching", 160);
         } else if (sTb->host) {
@@ -1696,6 +1712,8 @@ static void Tb_Speak(void) {
         PortA11y_Say(line, TB_SAY_INTERRUPT);
         Ps_Copy(said, focus, 160);
         Ps_Copy(typed, now, 40);
+        changed = 1;
+        prompts = -1; /* (this frame's buttons are still the last page's: its update set them before the page changed) */
     } else { /* what was typed, then where the cursor went (one line: two in one blank, the second cuts the first) */
         static char line[256];
         s32 k;
@@ -1725,6 +1743,18 @@ static void Tb_Speak(void) {
         if (line[0] != 0) {
             PortA11y_Say(line, TB_SAY_INTERRUPT);
         }
+    }
+    /* the page's buttons, after its title: once the page has set them, and again when it gains one (Copy Code,
+       once the room's code has come); put into words on the PC's side, with the controller's names */
+    for (count = 0; Ps_PromptAt(count, &plabel) >= 0; count++) {
+    }
+    if (!changed && (prompts < 0 || count > prompts)) {
+        for (pk = 0; pk < count; pk++) {
+            s32 kind = Ps_PromptAt(pk, &plabel); /* (apart: the order a call's arguments are worked out in is not C's to promise) */
+            PortA11y_TboPrompt(kind, plabel);
+        }
+        PortA11y_TboPromptsSay(sTb->typing);
+        prompts = count;
     }
     if (sTb->note > 0 && !noted) { /* a note (copied, a code that did not work ...) */
         PortA11y_Say(sTb->noteLine, 0);

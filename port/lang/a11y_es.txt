@@ -1221,8 +1221,8 @@ baf0a7c417e388af	Vida
 3fbcd38e0e468fe6	Transformación y ataque definitivo
 # When one more transformation or the Ultimate Blast comes within reach.
 155a8ca3a5af7b73	Cuando queda al alcance una transformación más o el ataque definitivo.
-# Gauges on request
-262f74e8463ad90f	Estado a pedido
+# Gauges: health, ki and blast
+d61d8fc1ecf3140a	Estado: vida, ki y blast
 # Select alone in a fight (Create on a DualSense, View on an Xbox controller): your gauges;\nSelect twice quickly: the rival's. F3 and F4 on the keyboard: player 1's and player 2's.\nTwo beeps, louder the less health is left, or health, ki and blast said by the screen\nreader, or both. Outside a fight, Select says the last message again.
 64e241d5b84dadde	Select solo en una pelea (Create en un DualSense, Vista en un control de Xbox): tu estado; Select dos veces rápido: el del rival. F3 y F4 en el teclado: el del jugador 1 y el del jugador 2. Dos pitidos, más fuertes cuanta menos vida queda, o la vida, el ki y el blast dichos por el lector de pantalla, o las dos cosas. Fuera de una pelea, Select repite el último mensaje.
 # The accessibility's sounds in a fight: the alerts below that are told by a sound. 0 turns them off.
@@ -1460,8 +1460,8 @@ dcb98818fee0146e	lejos
 f66494d8a426700d	El rival no se ve
 # You are blinded: the rival is not seen
 0fa2eebd457943dd	Te cegaron: no ves al rival
-# Select in a fight (Create on a DualSense, View on an Xbox controller): once, where the rival is, a ping\nfrom there and a few words; twice quickly, your gauges; three times, the rival's. F5 on the keyboard: where\nthe rival is; F3 and F4: player 1's and player 2's gauges. The gauges as two beeps (yours clean, the\nrival's with a buzz), or health, ki and blast said by the screen reader, or both. Outside a fight, Select\nsays the last message again.
-043c0c1940505fa3	Select en la pelea (Create en un DualSense, Vista en un control de Xbox): un toque, dónde está el rival, con un ping desde ahí y unas palabras; dos toques rápidos, tus barras; tres, las del rival. En el teclado, F5: dónde está el rival; F3 y F4: las barras del jugador 1 y del jugador 2. Las barras como dos pitidos (los tuyos limpios, los del rival con un zumbido), o la vida, el ki y el blast dichos por el lector de pantalla, o las dos cosas. Fuera de la pelea, Select repite el último mensaje.
+# Select in a fight (Create on a DualSense, View on an Xbox controller): once, where the rival is, a\nping from there and a few words; twice quickly, your gauges; three times, the rival's. F5 on the keyboard:\nwhere the rival is; F3 and F4: player 1's and player 2's gauges. The gauges as two beeps (yours clean, the\nrival's with a buzz), or health, ki and blast said by the screen reader, or both. "Also by itself": told\ntoo each time a whole bar of health or ki, or a blast stock, comes or goes (the rival's: health and blast),\nwithout pressing anything. Outside a fight, Select says the last message again.
+ecf91f87e5ded3fa	Select en la pelea (Create en un DualSense, Vista en un control de Xbox): una vez, dónde está el rival, un sonido de sonar desde ahí y unas palabras; dos veces rápido, tu estado; tres veces, el del rival. F5 en el teclado: dónde está el rival; F3 y F4: el estado del jugador 1 y del jugador 2. El estado como dos pitidos (el tuyo limpio, el del rival con un zumbido), o la vida, el ki y el blast dichos por el lector de pantalla, o ambos. «También automático»: se dice además cada vez que se gana o se pierde una barra entera de vida o de ki, o un blast (del rival: vida y blast), sin apretar nada. Fuera de la pelea, Select repite el último mensaje.
 # A sonar ping, here from the right
 68392ee553e2d1ac	Un ping de sonar, aquí desde la derecha
 # Where the rival is, Select once in a fight: the ping comes from the rival's side, higher when the rival is above you, lower when below.
@@ -1496,7 +1496,285 @@ c6c2c5dc93725972	Hola. Este juego habla con tu lector de pantalla. %s repite lo 
 45914f97abac6f5f	Perfil para jugar sin ver: activar lo recomendado
 # Blind player profile on.
 2ae6ea3bed1aaf19	Perfil para jugar sin ver activado.
-# Distance, edge and health by a sound; the important moments by the screen reader; a transformation, the\nUltimate Blast and the gauges on request by both; the cues at 85 and the music in fights at 70. Each one\ncan be changed below afterwards. With NVDA or JAWS this is done by itself the first time.
-686bcb5a26d63c6c	Distancia, borde y vida con sonido; los momentos importantes con el lector de pantalla; la transformación, el ataque definitivo y el estado a pedido con los dos; los avisos al 85 y la música en la pelea al 70. Cada uno se puede cambiar después aquí abajo. Con NVDA o JAWS esto se hace solo la primera vez.
+# Distance, edge and health by a sound; the important moments by the screen reader; where the rival is, a\ntransformation, the Ultimate Blast and the gauges on request by both; the cues at 85 and the music in\nfights at 70. Each one can be changed below afterwards. With NVDA or JAWS this is done by itself the first time.
+70a01512c725b5d0	Distancia, borde y vida con sonido; los momentos importantes con el lector de pantalla; dónde está el rival, la transformación, el ataque definitivo y el estado a pedido con los dos; los avisos al 85 y la música en la pelea al 70. Cada uno se puede cambiar después aquí abajo. Con NVDA o JAWS esto se hace solo la primera vez.
 # In the game, F1 opens the settings: their Accessibility tab has the fight's sounds and the blind player profile, which is turned on by itself with NVDA or JAWS.
 932dbc406cdc5dab	En el juego, F1 abre los ajustes: su pestaña Accesibilidad tiene los sonidos de la pelea y el perfil para jugar sin ver, que se activa solo con NVDA o JAWS.
+# The settings window's texts added by upstream 0.1.36 to 0.1.37.1 (UI, Misc, the chat window), found with
+# port/tools/a11y_ui_missing.py.
+# Unavailable
+43e9aef7aa01fca9	No disponible
+# End an online match on a desync
+76ed65eb07effadf	Terminar una partida en línea si se desincroniza
+# The two games compare what they compute. Off: when they no longer agree you are told, and the match\ngoes on (the two screens may then show different fights). On: the match ends there.
+2a6f436c18a2d97f	Los dos juegos comparan lo que calculan. Apagado: cuando dejan de coincidir se te avisa y la partida sigue (las dos pantallas pueden mostrar peleas distintas). Encendido: la partida termina ahí.
+# Language|settings
+68d5faa7bc5b0768	Idioma
+# Game language based on available translations.
+bb87c144cd464438	Idioma del juego, según las traducciones disponibles.
+# Show language selector at startup
+dcea1b675a45fed1	Mostrar la elección de idioma al arrancar
+# Show the language list at every normal startup when more than one language is available.
+24eff67913436280	Muestra la lista de idiomas cada vez que el juego arranca normalmente, si hay más de un idioma disponible.
+# Language saved. It will apply on the next launch.
+d6287d2cf6e4a921	Idioma guardado. Se aplica la próxima vez que abras el juego.
+# Original uses the game's sprites. Other fonts replace matching menu labels immediately.\nBattle announcements have their own setting below.
+8b736b29e0ecd3a5	Original usa los dibujos del propio juego. Las otras letras reemplazan al instante las etiquetas de menú que coinciden. Los anuncios de la pelea tienen su propio ajuste, más abajo.
+# Battle font
+a259b981f4ca9920	Letra de la pelea
+# Choose original battle announcements and HUD text, or any battle font listed in fonts.tsv.
+d94dfdc50ecd77af	Elige los anuncios y los textos originales de la pelea, o cualquier letra de pelea de la lista fonts.tsv.
+# Fighter panels
+5cb5249be98c34a5	Paneles de luchadores
+# What fills the sides where the picture is narrower than the window:\na 4:3 picture, or the menus with "Menus in 4:3", in a wide window.\nFighter panels: the border, and in a fight each side's fighter with its name and form.\nYour own: a folder "bars" next to the game with trim.png (the strip along the\npicture, kept in proportion) and fill.png (stretched over the rest). Read at start.
+5e6a82c458f47fd3	Qué llena los costados donde la imagen es más angosta que la ventana: una imagen 4:3, o los menús con "Menús en 4:3", en una ventana ancha. Paneles de luchadores: el borde, y en una pelea el luchador de cada lado con su nombre y su forma. Las propias: una carpeta "bars" junto al juego con trim.png (la franja a lo largo de la imagen, en proporción) y fill.png (estirada sobre el resto). Se leen al arrancar.
+# Name font
+51aea011ffb22c43	Letra del nombre
+# The fighter's name down the panel. The game's fonts, as for the Menu font\n(a font of your own: add it to fonts/fonts.tsv). Default: the first of the list.
+865a85c61bdea620	El nombre del luchador, a lo largo del panel. Las letras del juego, como en Letra de los menús (para una letra propia, agrégala a fonts/fonts.tsv). Predeterminada: la primera de la lista.
+# Form font
+5be6d8a1ce49b970	Letra de la forma
+# The form under the portrait. The game's fonts, as for the Menu font.\nDefault: the first of the list.
+d5ebbce302ea6789	La forma, debajo del retrato. Las letras del juego, como en Letra de los menús. Predeterminada: la primera de la lista.
+# up|settings
+830cdf359ec76d79	arriba
+# down|settings
+d8f94abddb4d9f96	abajo
+# left|settings
+cda2841f70bdaee9	izquierda
+# right|settings
+833ce4480cbf96c6	derecha
+# pressed|settings
+98b6287742341866	apretado
+# Chat (Tab)
+1e5bb9c1d10f54b1	Chat (Tab)
+# Drag anywhere to move the chat window. Click a line to copy it.
+e7bfcfb1465d7919	Arrastra desde cualquier parte para mover la ventana del chat. Haz clic en una línea para copiarla.
+# Mute|settings
+642f95858d49c1c5	Silenciar
+# Click to copy
+7a1d3718f1c32f69	Clic para copiar
+# 1 line/s: Enter to send
+1d601c3d0ab16709	Una línea por segundo: Intro para enviar
+# Enter: send Esc/Tab: close Ctrl+V: paste
+3f7eba61b6c45737	Intro: enviar. Escape o Tab: cerrar. Control más V: pegar.
+# The controllers (port/src/gs/gs_input.c): what is plugged in, at the start and when it changes.
+# Controllers: %s.
+a3d2389fbec77392	Controles: %s.
+# %s, player %d
+fc04c2942b3ba8d9	%s, jugador %d
+# %s, no player
+4ae81cdbf91fc76f	%s, sin jugador
+# No controller: the keyboard plays.
+2feaafaeb6092c13	Ningún control conectado: se juega con el teclado.
+# %s is not recognized: it was given the most common layout. If its buttons do not match, F1, Controls, "Set up a controller" asks for them one by one.
+19dfefda77717766	%s no es un control conocido: se le dio la distribución más común. Si sus botones no coinciden, F1, Controles, «Configurar un control» los pide uno por uno.
+# Controller disconnected: %s.
+24a25e74b07ede7c	Control desconectado: %s.
+# Controller connected: %s, player %d.
+da2d6e5596b3e64c	Control conectado: %s, jugador %d.
+# Controller connected: %s, no player (chosen in F1, Controls).
+a686a14d49e27ef3	Control conectado: %s, sin jugador (se elige en F1, Controles).
+# Player %d has no controller.
+39391c951f24a822	El jugador %d se quedó sin control.
+# The keyboard still plays.
+38adec35d4ee677a	El teclado sigue funcionando.
+# Player %d: %s.
+c2b8af32683aa7b7	Jugador %d: %s.
+# Controller not recognized: %s. F1, Controls, "Set up a controller" asks for its buttons one by one.
+267359421168f97a	Control no reconocido: %s. F1, Controles, «Configurar un control» pide sus botones uno por uno.
+# V6.2: where the rival is, told by itself
+# Where the rival is
+54416eb8b959a6c5	Dónde está el rival
+# Only with Select
+dc79be4ebd99621b	Solo con Select
+# By itself: sound
+44a85d5b7b8757f0	Automático: sonido
+# By itself: screen reader
+82e60355c26723b8	Automático: lector de pantalla
+# By itself: sound and screen reader
+c9cbb63783eef226	Automático: sonido y lector de pantalla
+# In a fight, with nothing to press: a ping from where the rival is, every second or two (sooner when\nnearer), and the screen reader says where whenever that changes: ahead or behind, to the left or the right,\nabove or below, and how far. Nothing while the rival is out of sight. Select once in a fight (F5 on the\nkeyboard) asks for it at any time, whatever is chosen here.
+8c2f5cc0d1546238	En la pelea, sin apretar nada: un sonido de sonar desde donde está el rival, cada uno o dos segundos (más seguido cuanto más cerca), y el lector de pantalla dice dónde está cada vez que cambia: adelante o atrás, a la izquierda o a la derecha, arriba o abajo, y a qué distancia. Nada mientras el rival no se ve. Select una vez en la pelea (F5 en el teclado) lo pregunta cuando quieras, elijas lo que elijas aquí.
+# V6.2: everything by itself, the gauges by themselves, setting up a controller
+# Everything by itself: every alert by sound and screen reader
+16e1f948dcbaef15	Todo automático: cada aviso con sonido y lector de pantalla
+# Everything by itself on: nothing needs Select.
+34923f38d4f269d3	Todo automático activado: nada necesita Select.
+# Every alert below told by a sound and by the screen reader, and the gauges and where the rival is told by\nthemselves as they change: nothing needs Select, and the fight is full of sounds and words. Each one can be\nchanged below afterwards.
+567157abe863eb00	Cada aviso de abajo con un sonido y con el lector de pantalla, y el estado y dónde está el rival dichos solos cada vez que cambian: nada necesita Select, y la pelea se llena de sonidos y palabras. Cada uno se puede cambiar después aquí abajo.
+# Sound, with Select
+c801198fdfddabd8	Sonido, con Select
+# Screen reader, with Select
+dab4ea0599861fc0	Lector de pantalla, con Select
+# Sound and screen reader, with Select
+633b46a3ac61344e	Sonido y lector de pantalla, con Select
+# Sound, also by itself
+18aafd686b74709b	Sonido, también automático
+# Screen reader, also by itself
+cb1950ba6693e393	Lector de pantalla, también automático
+# Sound and screen reader, also by itself
+f47a3ebf48b192fd	Sonido y lector de pantalla, también automático
+# The controller's buttons also arrive as keyboard keys: a program turns them into keys (Steam, DS4Windows, JoyToKey, or the console's own software). The game now leaves the keyboard out while the controller is used.
+038f64169e05682c	Los botones del control también llegan como teclas del teclado: un programa los convierte en teclas (Steam, DS4Windows, JoyToKey o el programa propio de la consola). Desde ahora el juego no lee el teclado mientras se usa el control.
+# Setting up a controller. Press any button on the controller to set up. Escape stops.
+0b391f74a6a30f32	Configurar un control. Aprieta cualquier botón del control que quieres configurar. Escape cancela.
+# The setup could not be used. The game's log has the reason.
+4c3f146fb0423667	La configuración no se pudo usar. El registro del juego tiene el motivo.
+# Done: %s is set up, %d parts of %d, and it is kept for the next times.
+c6c913abdecb43ca	Listo: %s quedó configurado, %d partes de %d, y se guardó para las próximas veces.
+# Done: %s works now, %d parts of %d, but it could not be kept for the next times: the game's folder cannot be written.
+f404c543bf49d632	Listo: %s ya funciona, %d partes de %d, pero no se pudo guardar para las próximas veces: no se puede escribir en la carpeta del juego.
+# %s. Now each part in turn. A part it does not have: wait ten seconds, and it is skipped.
+b23a1fc84f4427d3	%s. Ahora cada parte por turno. Si no tiene una parte, espera diez segundos y se salta.
+# That one is already %s. Press another, or wait to skip.
+ee03b074afad039a	Ese ya es %s. Aprieta otro, o espera para saltarlo.
+# Skipped.
+8ffdf6f19f8225db	Salteado.
+# No controller is plugged in: plug one in and try again.
+da2738fc4a155c08	No hay ningún control conectado: conecta uno y vuelve a intentarlo.
+# Nothing was pressed: the setup stopped, and nothing changed.
+7512807f38e53db4	No se apretó nada: la configuración terminó y no cambió nada.
+# The setup stopped. The controller is as it was.
+2b72be67c111dfa1	Configuración cancelada. El control quedó como estaba.
+# No button was pressed: the setup stopped.
+ff134fd5af2817b0	No se apretó ningún botón: la configuración terminó.
+# The controller was unplugged: the setup stopped.
+188f6755a5c63ded	Se desconectó el control: la configuración terminó.
+# Press Cross: of the four buttons on the right, the one nearest to you.
+c5f7b02622a75928	Aprieta Cruz: de los cuatro botones de la derecha, el más cercano a ti.
+# Press Circle: of the four, the one on the right.
+fe28e7bc10ff3e01	Aprieta Círculo: de los cuatro, el de la derecha.
+# Press Square: of the four, the one on the left.
+e7eb95bab281c9cf	Aprieta Cuadrado: de los cuatro, el de la izquierda.
+# Press Triangle: of the four, the one farthest from you.
+4a3ec1c687c651c9	Aprieta Triángulo: de los cuatro, el más lejano.
+# Press up on the d-pad, the cross on the left.
+5bfb2f3cd1673553	Aprieta arriba en la cruceta, la cruz de la izquierda.
+# Press down on the d-pad.
+853c36d82ce4a944	Aprieta abajo en la cruceta.
+# Press left on the d-pad.
+c5e23731ea29effd	Aprieta izquierda en la cruceta.
+# Press right on the d-pad.
+48d081caa8db1e6e	Aprieta derecha en la cruceta.
+# Press L1: the upper button on the left edge, under your index finger.
+b60f6b5fc99954c8	Aprieta L1: el botón de arriba en el borde izquierdo, bajo tu dedo índice.
+# Press R1: the upper button on the right edge.
+aee1cba0eab7d0df	Aprieta R1: el botón de arriba en el borde derecho.
+# Press L2: the lower button on the left edge.
+6428e71d443b46c0	Aprieta L2: el botón de abajo en el borde izquierdo.
+# Press R2: the lower button on the right edge.
+70b72f6acda2e86d	Aprieta R2: el botón de abajo en el borde derecho.
+# Press Select: of the small buttons in the middle, the one on the left.
+f68a88abbc3bcde1	Aprieta Select: de los botones chicos del medio, el de la izquierda.
+# Press Start: of the small buttons in the middle, the one on the right.
+e43395f60c99d3cc	Aprieta Start: de los botones chicos del medio, el de la derecha.
+# Press the left stick down into the controller, until it clicks.
+5ae0842a345caca3	Hunde la palanca izquierda hacia adentro del control, hasta que haga clic.
+# Press the right stick down into the controller, until it clicks.
+8b2fd9ef30d640d4	Hunde la palanca derecha hacia adentro del control, hasta que haga clic.
+# Left stick, left and right
+293f35eafdf20182	Palanca izquierda, izquierda y derecha
+# Push the left stick all the way to the right, and let it go.
+2dcb2efcb56528b1	Empuja la palanca izquierda hasta el fondo a la derecha, y suéltala.
+# Left stick, up and down
+a27c7751956c8b98	Palanca izquierda, arriba y abajo
+# Push the left stick all the way down, towards you, and let it go.
+55ca8f00ae2c896a	Empuja la palanca izquierda hasta el fondo hacia abajo, hacia ti, y suéltala.
+# Right stick, left and right
+eebba8351e7675b7	Palanca derecha, izquierda y derecha
+# Push the right stick all the way to the right, and let it go.
+77810f9d9e84897c	Empuja la palanca derecha hasta el fondo a la derecha, y suéltala.
+# Right stick, up and down
+f3a47f057ad8280f	Palanca derecha, arriba y abajo
+# Push the right stick all the way down, towards you, and let it go.
+3ae21c66361c93f5	Empuja la palanca derecha hasta el fondo hacia abajo, hacia ti, y suéltala.
+# Set up a controller
+b6de8730f4066309	Configurar un control
+# Stop setting up (Esc)
+f66224133713d41e	Cancelar la configuración (Esc)
+# For a controller whose buttons do not work, or do not do what they say: press any button on it,\nthen each button and stick as the screen reader (and this line) asks for it. A part it does not\nhave: wait ten seconds. Kept in gamecontrollerdb_own.txt for the next times.
+3be18a92527c0fe9	Para un control cuyos botones no funcionan, o no hacen lo que dicen: aprieta cualquier botón de él, y después cada botón y palanca a medida que el lector de pantalla (y esta línea) los pide. Si no tiene una parte, espera diez segundos. Se guarda en gamecontrollerdb_own.txt para las próximas veces.
+# Upstream 0.1.38: the settings window's new options
+# The game reads the controller, computes, and then waits before the picture is shown:\nabout 33 ms in a fight. With this on the wait comes first, so the picture follows\nyour press by the few milliseconds the machine needs. The game itself is unchanged.\nWith Smooth motion as well: its in-between picture then follows your press at once and\nthe full one a refresh later. Not used online. Off by default: on a machine that\ncannot keep up it may stutter where the original order would not.
+be3ab7a330260f36	El juego lee el control, calcula, y después espera antes de mostrar la imagen: unos 33 ms en una pelea. Con esto activado la espera va primero, así la imagen sigue a lo que aprietas en los pocos milisegundos que la máquina necesita. El juego en sí no cambia. Con Movimiento suave también: su imagen intermedia sigue a lo que aprietas al instante y la completa un refresco después. No se usa en línea. Apagado de fábrica: en una máquina que no da abasto puede trabarse donde el orden original no lo haría.
+# Render on a second processor core (experimental, after a restart)
+2f218d78b9c243f5	Dibujar en un segundo núcleo del procesador (experimental, después de reiniciar)
+# The picture is prepared and shown on a core of its own while the game computes the next\nmoment: faster where the processor is the slow part (older or low-power machines).\nThe same picture and the same game. Takes effect when the game is started again.\nNot with the OpenGL renderer, and not on machines with two cores or fewer.
+ea2ee996f284f538	La imagen se prepara y se muestra en un núcleo propio mientras el juego calcula el momento siguiente: más rápido donde el procesador es la parte lenta (máquinas viejas o de bajo consumo). La misma imagen y el mismo juego. Se aplica cuando el juego se vuelve a abrir. No con el dibujo OpenGL, ni en máquinas de dos núcleos o menos.
+# Menu size
+1935b7b4f3e9a8af	Tamaño del menú
+# The size of this window, the online windows, the chat and the notices. They already grow\nwith a picture taller than 1080 pixels; this makes them larger or smaller than that.
+30d9e816e7bdcee6	El tamaño de esta ventana, las ventanas en línea, el chat y los avisos. Ya crecen con una imagen de más de 1080 píxeles de alto; esto los hace más grandes o más chicos que eso.
+# Full
+b0e97584dc715a5c	Completo
+# Light
+3b0ab4b52326316f	Ligero
+# Weather amount
+1f43717bbbe175c5	Cantidad de clima
+# Light: half of the haze's sprites, a thinner haze; about half of what switching it off gains.
+546bc43fa49a110d	Ligero: la mitad de las partículas de la bruma, una bruma más fina; cerca de la mitad de lo que se gana apagándola.
+# The glow around characters and things (a Super Saiyan's hair, auras).\n100% is what the PlayStation 2 draws; the default here is 60%.
+c712a473afe0eee0	El brillo alrededor de personajes y cosas (el pelo de un Super Saiyajin, las auras). 100 % es lo que dibuja la PlayStation 2; aquí viene en 60 %.
+# Glare strength
+6d06aafee1c82729	Intensidad del resplandor
+# The glare of the sky and the stage's light.\n100% is what the PlayStation 2 draws; the default here is 60%.
+04e99103f12e641e	El resplandor del cielo y de la luz del escenario. 100 % es lo que dibuja la PlayStation 2; aquí viene en 60 %.
+# Sharp stage blur
+c754bb9959aa2c42	Desenfoque nítido del escenario
+# On: the stage's blur keeps the detail of the internal resolution (crisper, as other\nemulators show it upscaled). Off: as soft as the PlayStation 2 draws it. No difference at 1x.
+273aceb278d3ce5f	Activado: el desenfoque del escenario conserva el detalle de la resolución interna (más nítido, como lo muestran otros emuladores ampliado). Apagado: tan suave como lo dibuja la PlayStation 2. Sin diferencia en 1x.
+# Hide the mouse pointer during play
+d55f2199c34f1511	Ocultar el puntero del mouse al jugar
+# The pointer is hidden over the game and shown in this window, the online windows, the\nquestion before the game closes and while a chat line is typed.
+31dd387f0919334b	El puntero se oculta sobre el juego y se muestra en esta ventana, las ventanas en línea, la pregunta antes de cerrar el juego y mientras se escribe una línea del chat.
+# Quick saving
+f088120fade65b22	Guardado rápido
+# Save and load without the memory card pages: no question, no waiting, a small card in the\ncorner while it saves, and the save loaded at start without a page. Load in the options\nstill asks first, then loads at once. A missing card, a full card or a failed save is\nstill shown. Online the game's own pages always run. Off: the game's own pages.
+4803e75551b3507a	Guardar y cargar sin las pantallas de la memory card: sin pregunta, sin espera, una tarjetita en la esquina mientras guarda, y la partida cargada al empezar sin pantalla. Cargar en las opciones todavía pregunta primero y después carga al instante. Una tarjeta que falta, llena o un guardado que falla se siguen mostrando, y el lector los lee. En línea siempre van las pantallas del juego. Apagado: las pantallas del juego.
+# Saved
+44fa1773e1e78784	Guardado
+# Online: the chat said, the match's banner
+# Read the online chat
+25ea3ce8e3893b51	Leer el chat en línea
+# Chat, %s: %s
+e1db9bceb28d6be9	Chat, %s: %s
+# Your rival "%s" is here! The match begins.
+37797d3ae99d0801	Llegó tu rival, "%s". ¡Empieza la partida!
+# Connecting to your rival...
+cfcd9718ebbad057	Conectando con tu rival...
+# In an online match, the screen reader says each line the other player writes in the chat, with their name.
+edb5e2b91543d8f7	En una partida en línea, el lector de pantalla dice cada línea que el otro jugador escribe en el chat, con su nombre.
+# Online: the pages' buttons; the save loaded at start
+# Back|tbo
+7b81d10983156e15	Volver
+# Change|tbo
+7ac53b46c7edcf1e	Cambiar
+# Enter|tbo
+9ae569215bcc2c0e	Elegir
+# Delete|tbo
+c3a05f61e88c831d	Borrar
+# Cancel|tbo
+94eac53956db7b74	Cancelar
+# Train While Waiting|tbo
+5ee6089f50d47cf4	Entrenar mientras esperas
+# Start Training|tbo
+a5df69d75d55fa80	Empezar el entrenamiento
+# Next|tbo
+c4afbcaf313922b3	Siguiente
+# Search|tbo
+2c23bbd6b49fa9a2	Buscar
+# Open Room|tbo
+bbcff77a1d47181f	Abrir la sala
+# Type Name|tbo
+e48ea88bfc44b287	Escribir el nombre
+# Copy Code|tbo
+71705499e2d467c2	Copiar el código
+# Left and right
+6abfc6f4089c281f	Izquierda y derecha
+# %s: %s.
+f70fa25b39f1a74f	%s: %s.
+# Type with the keyboard: Backspace deletes, Enter finishes, Escape goes back.
+ea3ccf82b4e57ae5	Escribe con el teclado: Retroceso borra, Intro termina, Escape vuelve.
+# Save loaded
+0a2ed49533198d05	Partida cargada

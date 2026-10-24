@@ -99,7 +99,8 @@ void PortA11y_PadUsed(const SDL_Event *ev) {
     } else if (ev->gbutton.button == SDL_GAMEPAD_BUTTON_BACK && slot >= 0) {
         held[slot].id = 0;
         player = player_of(id); /* (-1: not a player's controller, or no longer there) */
-        if (held[slot].alone && now - held[slot].down < 500 && !gPortOverlayOpen && player >= 0) {
+        if (held[slot].alone && now - held[slot].down < 500 && !gPortOverlayOpen && !PortInput_Learning() && player >= 0) {
+            /* (a controller being set up, gs_input.c: its Select is the setup's "press Select", not a tap) */
             taps = now - lastTap < 400 && player == tapPlayer ? taps + 1 : 1;
             lastTap = now;
             tapPlayer = player;
@@ -240,6 +241,45 @@ const char *PortA11y_PadSourceName(int src) {
     int f = family(-1, &type);
 
     return f == FAMILY_NONE ? NULL : source_name(f, type, src);
+}
+
+/* Tenkaichi Budokai Online's pages (src/menu/port_tbo.c, Tb_Speak): the buttons at the foot of the page, said with
+   the names of player 1's controller, which is the one that plays online ("A: Enter. B: Back."), or with the keys
+   bound to them when there is none. The page gives them one at a time (PortA11y_TboPrompt: its kind as
+   port_screen.c's Ps_ButtonPic has it, and its label, the game's English), then PortA11y_TboPromptsSay says them
+   all. Everything is put together here, on the PC's side: the game's code only hands its own strings over. */
+static char sTboHint[640];
+const char *PortA11y_ActionName(int player, int action); /* (below) */
+extern void PortA11y_Say(const char *text, int flags); /* a11y.c */
+
+void PortA11y_TboPrompt(int kind, const char *label) {
+    extern void PortA11y_Note(const char *text);
+    /* a prompt's kind -> gs_input.c's action: cross, square, triangle, (left and right), circle, -, -, START */
+    static const int kAction[8] = {4, 6, 7, -1, 5, -1, -1, 14};
+    const char *button;
+    char part[200];
+    size_t n = strlen(sTboHint);
+
+    if (label == NULL || label[0] == '\0' || kind < 0 || kind > 7) {
+        return;
+    }
+    button = kind == 3 ? PortA11y_TrSense(NULL, "Left and right") : kAction[kind] >= 0 ? PortA11y_ActionName(0, kAction[kind]) : NULL;
+    if (button == NULL) {
+        return;
+    }
+    snprintf(part, sizeof(part), PortA11y_TrSense(NULL, "%s: %s."), button, PortA11y_TrSense("tbo", label));
+    snprintf(sTboHint + n, sizeof(sTboHint) - n, "%s%s", n > 0 ? " " : "", part);
+}
+
+void PortA11y_TboPromptsSay(int typing) {
+    if (typing && PortA11y_PadFamily(0) == 0) { /* (a keypad typed on with the PC's keyboard: the keys that type) */
+        snprintf(sTboHint, sizeof(sTboHint), "%s",
+                 PortA11y_TrSense(NULL, "Type with the keyboard: Backspace deletes, Enter finishes, Escape goes back."));
+    }
+    if (sTboHint[0] != '\0') {
+        PortA11y_Say(sTboHint, 0);
+    }
+    sTboHint[0] = '\0';
 }
 
 /* What a game action (gs_input.c's order: 0..15 the pad's buttons, 16..23 the sticks' directions) is for a player

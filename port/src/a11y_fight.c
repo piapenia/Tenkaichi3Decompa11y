@@ -10,6 +10,9 @@
  *             (the fighter's camera yaw, + 0x4A0: "on the right" is "push right"), muffled behind, higher above,
  *             and the words, "Rival ahead, to the right, above, close". Nothing while the rival is hidden or the
  *             player blinded. The log has the angles and, at each fight's end, the sign test of that reading.
+ *             And told by itself, with nothing to press (ALERT_WHERE, on by default: a player who cannot press
+ *             Select in the middle of a fight still knows): the ping every second or two, sooner when nearer, and the
+ *             words whenever the rival's place changes and stays so half a second.
  *   distance  a tick that repeats faster as the rival is nearer, higher when the rival is above and lower when
  *             below (Street Fighter 6's distance sound, with the height of a fight in the air); two ticks while
  *             the game itself counts the rival as close (fighter flag 0x13, BtlCharApi_IsClose). By voice: near,
@@ -117,26 +120,48 @@ enum { TONE_DISTANCE, TONE_DISTANCE_CLOSE, TONE_EDGE_WALL, TONE_EDGE_TOP, TONE_E
 #define WHO_RIVAL 1
 
 /* The alerts and how each is told (a bit each: 1 a sound, 2 the screen reader). */
-enum { ALERT_DISTANCE, ALERT_EDGE, ALERT_HEALTH, ALERT_POWER, ALERT_GAUGES, ALERT_MOMENTS, ALERT_NAMES, ALERT_INTRO, ALERTS };
+enum { ALERT_DISTANCE, ALERT_EDGE, ALERT_HEALTH, ALERT_POWER, ALERT_GAUGES, ALERT_MOMENTS, ALERT_NAMES, ALERT_INTRO, ALERT_WHERE,
+       ALERTS };
 #define BY_SOUND 1
 #define BY_VOICE 2
 /* (ALERT_MOMENTS: health down to two bars and to one, ki full, max power, told by themselves; ALERT_NAMES: the text
    the game shows in a fight, the techniques' names, said by the reader (a11y_game.c, shown_text); ALERT_INTRO: who
-   against whom and where, said while the fight's opening plays (a11y_game.c, fight_intro): both 0 or BY_VOICE) */
+   against whom and where, said while the fight's opening plays (a11y_game.c, fight_intro): both 0 or BY_VOICE;
+   ALERT_WHERE: where the rival is, told by itself (where_auto); 0 is "only when asked with Select") */
 static const char *const kKeys[ALERTS] = {"a11y_alert_distance", "a11y_alert_edge", "a11y_alert_health", "a11y_alert_power",
-                                          "a11y_gauges", "a11y_alert_moments", "a11y_technique_names", "a11y_fight_intro"};
-static const int kDefaults[ALERTS] = {0, 0, 0, BY_SOUND, BY_SOUND, BY_VOICE, BY_VOICE, BY_VOICE};
-static int sMode[ALERTS] = {-1, -1, -1, -1, -1, -1, -1, -1};
+                                          "a11y_gauges", "a11y_alert_moments", "a11y_technique_names", "a11y_fight_intro",
+                                          "a11y_alert_where"};
+static const int kDefaults[ALERTS] = {0, 0, 0, BY_SOUND, BY_SOUND, BY_VOICE, BY_VOICE, BY_VOICE, BY_SOUND | BY_VOICE};
+static int sMode[ALERTS] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+
+/* The gauges are told some way whenever they are asked for (1 sound, 2 voice, 3 both), and also by themselves with
+   4..6 (the same three ways): each time one of them changes (gauges_auto, a11y_game.c), for whoever would rather not
+   press Select in the middle of a fight. The other alerts are told by themselves anyway: 0..3. */
+#define GAUGES_BY_ITSELF 3
+static int highest(int alert) {
+    return alert == ALERT_GAUGES ? 3 + GAUGES_BY_ITSELF : 3;
+}
 
 static int mode(int alert) {
     if (sMode[alert] < 0) {
         int v = Port_Setting(kKeys[alert], kDefaults[alert]), lo = alert == ALERT_GAUGES ? 1 : 0;
-        sMode[alert] = v < lo || v > 3 ? kDefaults[alert] : v; /* (the gauges asked for are always told some way) */
+        sMode[alert] = v < lo || v > highest(alert) ? kDefaults[alert] : v; /* (the gauges asked for are always told some way) */
     }
     return sMode[alert];
 }
 
-/* For the settings window (gs/a11y_ui.cpp): how an alert is told, 0..3 (the gauges: 1..3). */
+/* How the gauges are told, 1..3, whether they were asked for or changed by themselves. */
+static int gauges_how(void) {
+    int m = mode(ALERT_GAUGES);
+    return m > 3 ? m - GAUGES_BY_ITSELF : m;
+}
+
+/* a11y_game.c, gauges_auto: 1 when the gauges are told by themselves as they change, not only when asked for. */
+int PortA11y_GaugesByItself(void) {
+    return mode(ALERT_GAUGES) > 3;
+}
+
+/* For the settings window (gs/a11y_ui.cpp): how an alert is told, 0..3 (the gauges: 1..6). */
 int PortA11y_AlertMode(int alert) {
     return alert >= 0 && alert < ALERTS ? mode(alert) : 0;
 }
@@ -153,16 +178,30 @@ int PortA11y_IntroDescription(void) {
 
 void PortA11y_SetAlertMode(int alert, int value) {
     if (alert >= 0 && alert < ALERTS) {
-        sMode[alert] = value < (alert == ALERT_GAUGES ? 1 : 0) ? (alert == ALERT_GAUGES ? 1 : 0) : value > 3 ? 3 : value;
+        int lo = alert == ALERT_GAUGES ? 1 : 0;
+        sMode[alert] = value < lo ? lo : value > highest(alert) ? highest(alert) : value;
         Port_SettingSave(kKeys[alert], sMode[alert]);
     }
+}
+
+/* The Accessibility tab's "Everything by itself": every alert by a sound and the screen reader, the gauges and
+   where the rival is told by themselves too, nothing that needs Select. */
+void PortA11y_AllByItself(void) {
+    extern void Port_SettingsWrite(void);
+    int i;
+
+    for (i = 0; i < ALERTS; i++) {
+        PortA11y_SetAlertMode(i, i == ALERT_GAUGES ? 3 + GAUGES_BY_ITSELF : i == ALERT_NAMES || i == ALERT_INTRO ? BY_VOICE : BY_SOUND | BY_VOICE);
+    }
+    Port_SettingsWrite();
 }
 
 /* ---- the blind player profile ----
  *
  * What is recommended for playing without seeing (the audit of 2026-10-17, plan V6.1): distance, edge and health by
- * sound; the important moments by the screen reader; a transformation and the Ultimate Blast, and the gauges on
- * request, by both; the cues at 85 %; the music in fights at 70 % (about 3 dB under). The rest as it is by default.
+ * sound; the important moments by the screen reader; a transformation and the Ultimate Blast, the gauges on request,
+ * and where the rival is (by itself), by both; the cues at 85 %; the music in fights at 70 % (about 3 dB under). The
+ * rest as it is by default.
  * The Accessibility tab's first button applies it; and it is applied by itself once, the first time NVDA or JAWS
  * speaks, unless the alerts or the cues' volume were set by hand before (bt3_settings.txt has one of them): the
  * setting a11y_profile is 1 once it was applied, 0 when it was not because of those. With another reader or a voice
@@ -176,7 +215,8 @@ extern void Port_SettingsWrite(void);
 static int sProfile = -1; /* this run: -1 not decided yet, 0 not applied by itself, 1 applied by itself */
 
 void PortA11y_ApplyProfile(void) {
-    static const int kProfile[ALERTS] = {BY_SOUND, BY_SOUND, BY_SOUND, BY_SOUND | BY_VOICE, BY_SOUND | BY_VOICE, BY_VOICE, BY_VOICE, BY_VOICE};
+    static const int kProfile[ALERTS] = {BY_SOUND, BY_SOUND, BY_SOUND, BY_SOUND | BY_VOICE, BY_SOUND | BY_VOICE, BY_VOICE, BY_VOICE, BY_VOICE,
+                                         BY_SOUND | BY_VOICE};
     int i;
 
     for (i = 0; i < ALERTS; i++) {
@@ -247,9 +287,9 @@ static int health_loud(int hp, int max) {
 /* The gauges asked for (a11y_game.c, fight_gauges): the beeps when they go by sound, as loud as the glossary plays
    them (they were 6 dB softer at full health, under the fight's sound); returns how they are told, so that the
    caller says them when that includes the voice. */
-int PortA11y_GaugesQuery(int side) {
+int PortA11y_GaugesQuery(int side, int byItself) {
     extern int PortA11y_CueVolume(void); /* gs/a11y.c */
-    int m = mode(ALERT_GAUGES);
+    int m = gauges_how();
 
     if (m == BY_SOUND && PortA11y_CueVolume() <= 0) {
         m = BY_VOICE; /* (the cues turned off: the beeps would be silent, and a question gets an answer) */
@@ -259,8 +299,8 @@ int PortA11y_GaugesQuery(int side) {
         PortA11y_Tone(TONE_HEALTH, who_of(side), 0, 100);
     }
     {
-        char note[96];
-        snprintf(note, sizeof(note), "gauges asked: player %d (%s), told by %s", side + 1,
+        char note[112];
+        snprintf(note, sizeof(note), "gauges %s: player %d (%s), told by %s", byItself ? "changed" : "asked", side + 1,
                  who_of(side) == WHO_YOURS ? "yours" : "the rival's", m == BY_SOUND ? "sound" : m == BY_VOICE ? "voice" : "sound and voice");
         PortA11y_Note(note);
     }
@@ -351,12 +391,23 @@ static void where_words(int az, int el, int d, int close, char *en, char *said, 
     }
 }
 
-/* Select once in a fight (a11y.c): where the rival is, a sonar ping from there (from the left or the right as the
-   stick goes: "it sounds on the right" is "push right"; muffled behind; higher above, lower below; softer far away)
-   and the words, "Rival ahead, to the right, above, close". Only what a player who sees has: nothing while the
-   rival is hidden (a vanish) or you are blinded. */
+/* The sonar ping from the rival's direction (from the left or the right as the stick goes: "it sounds on the right"
+   is "push right"; muffled behind): the pitch by the elevation, an octave at 60 degrees and nothing within 8; the
+   loudness by the distance, all at 150 units and nearer, a little over half at 1500 and beyond. */
+static void where_ping(int az, int el, int d) {
+    int pitch, loud;
+
+    pitch = el > 8 ? (el - 8) * 12 / 52 : el < -8 ? (el + 8) * 12 / 52 : 0;
+    pitch = pitch > 12 ? 12 : pitch < -12 ? -12 : pitch;
+    loud = d <= 150 ? 100 : d >= 1500 ? 55 : 100 - (d - 150) * 45 / 1350;
+    PortA11y_ToneAt(TONE_WHERE, az * 100, pitch, loud);
+}
+
+/* Select once in a fight (a11y.c): where the rival is, a sonar ping from there (where_ping: higher above, lower
+   below, softer far away) and the words, "Rival ahead, to the right, above, close". Only what a player who sees
+   has: nothing while the rival is hidden (a vanish) or you are blinded. */
 void PortA11y_WhereQuery(void) {
-    int me = local_side(), az, el, d, close, pitch, loud;
+    int me = local_side(), az, el, d, close;
     char en[128], words[256], text[320], note[320];
     void GAME_PTR chr = BtlChar_FindBySide(me);
 
@@ -376,16 +427,87 @@ void PortA11y_WhereQuery(void) {
         PortA11y_Note(note);
         return;
     }
-    /* the pitch by the elevation: an octave at 60 degrees, nothing within 8; the loudness by the distance: all at 150
-       units and nearer, a little over half at 1500 and beyond */
-    pitch = el > 8 ? (el - 8) * 12 / 52 : el < -8 ? (el + 8) * 12 / 52 : 0;
-    pitch = pitch > 12 ? 12 : pitch < -12 ? -12 : pitch;
-    loud = d <= 150 ? 100 : d >= 1500 ? 55 : 100 - (d - 150) * 45 / 1350;
-    PortA11y_ToneAt(TONE_WHERE, az * 100, pitch, loud);
+    where_ping(az, el, d);
     where_words(az, el, d, close, en, words, (int)sizeof(words));
     snprintf(text, sizeof(text), tr("Rival %s"), words);
     PortA11y_Say(text, A11Y_INTERRUPT);
     snprintf(note, sizeof(note), "where asked: az %+d, el %+d, d %d, lock %d; said: Rival %s", az, el, d, BtlCharApi_IsLockedOn(me) != 0, en);
+    PortA11y_Note(note);
+}
+
+/* ---- where the rival is, told by itself (ALERT_WHERE) ----
+ *
+ * The same as the question, with nothing to press. By sound: the ping from the rival's direction every second when
+ * close, up to every two seconds far away. By the screen reader: the words ("Rival behind, to the left, far")
+ * whenever the rival's place, in those words, changes and then stays so half a second (a border crossed back and
+ * forth is not said each time), at most every second and a half, and queued after what is being said (a
+ * technique's name is not cut). Only what a player who sees has: while the rival is hidden or you are blinded no
+ * ping, and that is said once. Select still asks at any time, whatever is chosen. */
+#define WHERE_HOLD 30   /* blanks a new place must last before it is said (half a second) */
+#define WHERE_GAP 90    /* blanks at least between two places said (a second and a half) */
+#define WHERE_HIDDEN 1000
+#define WHERE_BLINDED 1001
+
+static int sWhereZone, sWhereHeld, sWhereSaid, sWhereNextSay, sWhereNextPing;
+
+/* A new fight: nothing heard yet, the first place said once it is steady. */
+static void where_reset(void) {
+    sWhereZone = sWhereSaid = -1;
+    sWhereHeld = 0;
+    sWhereNextSay = sWhereNextPing = sBlank;
+}
+
+/* The rival's place as one number, by the parts of its words (where_words): ahead or behind, the side, the height,
+   how far. */
+static int where_zone(int az, int el, int d, int close) {
+    int a = az < 0 ? -az : az;
+    int back = a > BEHIND;
+    int side = a > SIDE_FREE && a < 180 - SIDE_FREE ? (az > 0 ? 1 : 2) : 0;
+    int height = el >= LEVEL ? 1 : el <= -LEVEL ? 2 : 0;
+    int away = close ? 0 : d < (int)MIDDLE ? 1 : 2;
+
+    return ((back * 3 + side) * 3 + height) * 3 + away;
+}
+
+static void where_auto(int me, void GAME_PTR chr) {
+    int m = mode(ALERT_WHERE), az, el, d, close, zone;
+    char en[128], words[256], text[320], note[384];
+
+    if (!rel(me, &az, &el, &d)) {
+        return;
+    }
+    close = BtlCharApi_IsClose(me) != 0;
+    zone = BtlChar_TestFlag(chr, CHR_BLINDED) ? WHERE_BLINDED : BtlCharApi_IsHidden(me ^ 1) ? WHERE_HIDDEN : where_zone(az, el, d, close);
+    if ((m & BY_SOUND) && zone < WHERE_HIDDEN && sBlank >= sWhereNextPing) {
+        where_ping(az, el, d);
+        sWhereNextPing = sBlank + 60 + 60 * d / ((int)MIDDLE + d); /* (a second close by, two far away) */
+    }
+    if (!(m & BY_VOICE)) {
+        return;
+    }
+    if (zone != sWhereZone) {
+        sWhereZone = zone;
+        sWhereHeld = 0;
+        return;
+    }
+    if (++sWhereHeld < WHERE_HOLD || zone == sWhereSaid || sBlank < sWhereNextSay) {
+        return; /* (not steady yet, said already, or too soon after the last: looked at again next blank) */
+    }
+    sWhereSaid = zone;
+    sWhereNextSay = sBlank + WHERE_GAP;
+    if (zone == WHERE_BLINDED) {
+        snprintf(en, sizeof(en), "blinded");
+        snprintf(text, sizeof(text), "%s", tr("You are blinded: the rival is not seen"));
+    } else if (zone == WHERE_HIDDEN) {
+        snprintf(en, sizeof(en), "out of sight");
+        snprintf(text, sizeof(text), "%s", tr("Rival out of sight"));
+    } else {
+        where_words(az, el, d, close, en, words, (int)sizeof(words));
+        snprintf(text, sizeof(text), tr("Rival %s"), words);
+    }
+    PortA11y_Say(text, 0);
+    snprintf(note, sizeof(note), "where told: az %+d, el %+d, d %d, lock %d; said: %s%s", az, el, d, BtlCharApi_IsLockedOn(me) != 0,
+             zone < WHERE_HIDDEN ? "Rival " : "", en);
     PortA11y_Note(note);
 }
 
@@ -446,7 +568,7 @@ static void distance(int me, A11yVec *a, A11yVec *b) {
             next = sBlank + gap;
         }
     }
-    if (m & BY_VOICE) {
+    if ((m & BY_VOICE) && !(mode(ALERT_WHERE) & BY_VOICE)) { /* (told with where the rival is, when that is said) */
         now = (close ? 0 : d < MIDDLE ? 1 : 2) * 3 + (dy > HIGH ? 1 : dy < -HIGH ? 2 : 0);
         if (now != zone) {
             zone = now;
@@ -646,10 +768,12 @@ void PortA11y_FightAlerts(int fight) {
         char note[224];
         was = 1;
         sBlank += 600; /* (whatever was waiting from the last fight is due) */
+        where_reset();
         extern int PortA11y_CueVolume(void), PortA11y_FightMusic(void); /* gs/a11y.c, a11y_game.c */
-        snprintf(note, sizeof(note), "fight alerts: distance %d, edge %d, health %d, moments %d, power %d, gauges %d (0 off, 1 sound, "
-                 "2 voice, 3 both); cues %d %%, music in fights %d %%", mode(ALERT_DISTANCE), mode(ALERT_EDGE), mode(ALERT_HEALTH),
-                 mode(ALERT_MOMENTS), mode(ALERT_POWER), mode(ALERT_GAUGES), PortA11y_CueVolume(), PortA11y_FightMusic());
+        snprintf(note, sizeof(note), "fight alerts: distance %d, edge %d, health %d, moments %d, power %d, gauges %d, where %d (0 off, "
+                 "1 sound, 2 voice, 3 both); cues %d %%, music in fights %d %%", mode(ALERT_DISTANCE), mode(ALERT_EDGE),
+                 mode(ALERT_HEALTH), mode(ALERT_MOMENTS), mode(ALERT_POWER), mode(ALERT_GAUGES), mode(ALERT_WHERE),
+                 PortA11y_CueVolume(), PortA11y_FightMusic());
         PortA11y_Note(note);
     }
     sBlank++;
@@ -666,6 +790,9 @@ void PortA11y_FightAlerts(int fight) {
         if (mode(ALERT_EDGE)) {
             edge(me, chr, &a);
         }
+    }
+    if (mode(ALERT_WHERE)) {
+        where_auto(me, chr);
     }
     if (mode(ALERT_HEALTH)) {
         health(me);

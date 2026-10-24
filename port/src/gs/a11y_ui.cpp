@@ -30,6 +30,7 @@
 
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "net_chat.h" // PortChat_Read: the other player's chat lines said
 
 extern "C" {
 int PortA11y_On(void); // a11y.c
@@ -42,6 +43,7 @@ void PortA11y_SetVoices(int fight, int percent);
 int PortA11y_FightMusic(void);
 void PortA11y_SetFightMusic(int percent);
 void PortA11y_ApplyProfile(void); // a11y_fight.c: the blind player profile
+void PortA11y_AllByItself(void);  // ... and everything told by itself, nothing that needs Select
 void Port_SettingsWrite(void); // plat_settings.c
 void Ui_Toggle(void); // ui.cpp: opens or closes the window (F1)
 const char *PortA11y_PadSourceName(int src); // a11y_pad.c: a controller button by the name of the one in use
@@ -1404,7 +1406,7 @@ void speak(ImGuiContext &g) {
         if (!it.isWindow || it.window != it.root) {
             continue;
         }
-        Speech *sp = (it.window->Flags & ImGuiWindowFlags_Tooltip) ? &tip : strncmp(it.window->Name, "##notice", 8) == 0 ? &notice : NULL;
+        Speech *sp = (it.window->Flags & ImGuiWindowFlags_Tooltip) ? &tip : strcmp(it.window->Name, "##notice") == 0 ? &notice : NULL;
         if (sp == NULL) {
             continue;
         }
@@ -1674,9 +1676,16 @@ void A11yUi_Tab(void) {
         PortA11y_ApplyProfile();
         PortA11y_Say(shown("Blind player profile on."), A11Y_INTERRUPT);
     }
-    tab_tip("Distance, edge and health by a sound; the important moments by the screen reader; a transformation, the\n"
-            "Ultimate Blast and the gauges on request by both; the cues at 85 and the music in fights at 70. Each one\n"
-            "can be changed below afterwards. With NVDA or JAWS this is done by itself the first time.");
+    tab_tip("Distance, edge and health by a sound; the important moments by the screen reader; where the rival is, a\n"
+            "transformation, the Ultimate Blast and the gauges on request by both; the cues at 85 and the music in\n"
+            "fights at 70. Each one can be changed below afterwards. With NVDA or JAWS this is done by itself the first time.");
+    if (ImGui::Button(label_id("Everything by itself: every alert by sound and screen reader"))) {
+        PortA11y_AllByItself();
+        PortA11y_Say(shown("Everything by itself on: nothing needs Select."), A11Y_INTERRUPT);
+    }
+    tab_tip("Every alert below told by a sound and by the screen reader, and the gauges and where the rival is told by\n"
+            "themselves as they change: nothing needs Select, and the fight is full of sounds and words. Each one can be\n"
+            "changed below afterwards.");
     ImGui::Spacing();
     v = PortA11y_CueVolume();
     if (tab_slider("Cue sounds", &v, 0, 100, "%d%%")) {
@@ -1701,9 +1710,25 @@ void A11yUi_Tab(void) {
     tab_tip("The music and the stage's background sound during a battle, so that the accessibility's sounds are heard\n"
             "over them; 70 is about 3 dB under. The game's own music volume (Audio tab) stays as it is everywhere else.");
     ImGui::Spacing();
+    // Where the rival is (a11y_fight.c ALERT_WHERE): told by itself in a fight, or only when asked with Select. First of
+    // the alerts: it is what a player who cannot press Select in the middle of a fight needs most.
+    static const char *const kWhereWays[] = {"Only with Select", "By itself: sound", "By itself: screen reader",
+                                             "By itself: sound and screen reader"};
+    v = PortA11y_AlertMode(8);
+    if (tab_slider("Where the rival is", &v, 0, 3, shown(kWhereWays[v < 0 ? 0 : v > 3 ? 3 : v]))) {
+        PortA11y_SetAlertMode(8, v);
+    }
+    tab_tip("In a fight, with nothing to press: a ping from where the rival is, every second or two (sooner when\n"
+            "nearer), and the screen reader says where whenever that changes: ahead or behind, to the left or the right,\n"
+            "above or below, and how far. Nothing while the rival is out of sight. Select once in a fight (F5 on the\n"
+            "keyboard) asks for it at any time, whatever is chosen here.");
     // The fight's alerts (a11y_fight.c), each a slider over its ways of telling, so that the right stick changes it
-    // as it does the volumes; the gauges asked for have no "Off" (they are only told when asked).
+    // as it does the volumes. They are told by themselves; the gauges are told when asked for, in one of three ways
+    // (no "Off"), and with the last three also by themselves as they change.
     static const char *const kWays[] = {"Off", "Sound", "Screen reader", "Sound and screen reader"};
+    static const char *const kGaugeWays[] = {"", "Sound, with Select", "Screen reader, with Select",
+                                             "Sound and screen reader, with Select", "Sound, also by itself",
+                                             "Screen reader, also by itself", "Sound and screen reader, also by itself"};
     static const struct { const char *label, *tip; } kAlerts[] = {
         {"Distance to the rival", "A tick that repeats faster as the rival comes nearer, higher when the rival is above\n"
                                   "you and lower when below; two ticks within close range. By the screen reader: near,\n"
@@ -1714,19 +1739,21 @@ void A11yUi_Tab(void) {
                    "less is left; under a quarter, yours again every three seconds. In the middle: yours clean, the\n"
                    "rival's with a buzz."},
         {"Transformation and Ultimate Blast", "When one more transformation or the Ultimate Blast comes within reach."},
-        {"Gauges on request", "Select in a fight (Create on a DualSense, View on an Xbox controller): once, where the rival is, a ping\n"
-                              "from there and a few words; twice quickly, your gauges; three times, the rival's. F5 on the keyboard: where\n"
-                              "the rival is; F3 and F4: player 1's and player 2's gauges. The gauges as two beeps (yours clean, the\n"
-                              "rival's with a buzz), or health, ki and blast said by the screen reader, or both. Outside a fight, Select\n"
-                              "says the last message again."},
+        {"Gauges: health, ki and blast", "Select in a fight (Create on a DualSense, View on an Xbox controller): once, where the rival is, a\n"
+                              "ping from there and a few words; twice quickly, your gauges; three times, the rival's. F5 on the keyboard:\n"
+                              "where the rival is; F3 and F4: player 1's and player 2's gauges. The gauges as two beeps (yours clean, the\n"
+                              "rival's with a buzz), or health, ki and blast said by the screen reader, or both. \"Also by itself\": told\n"
+                              "too each time a whole bar of health or ki, or a blast stock, comes or goes (the rival's: health and blast),\n"
+                              "without pressing anything. Outside a fight, Select says the last message again."},
         {"Important moments", "Told by themselves, for both players: health down to two bars and then to one, the ki\n"
                               "full, max power. By the screen reader, by a sound (two beeps for health, three notes\n"
                               "going up for the ki, higher for max power), or both."},
     };
     for (int i = 0; i < (int)(sizeof(kAlerts) / sizeof(kAlerts[0])); i++) {
-        int lo = i == 4 ? 1 : 0;
+        int lo = i == 4 ? 1 : 0, hi = i == 4 ? 6 : 3;
         v = PortA11y_AlertMode(i);
-        if (tab_slider(kAlerts[i].label, &v, lo, 3, shown(kWays[v < lo ? lo : v > 3 ? 3 : v]))) {
+        v = v < lo ? lo : v > hi ? hi : v;
+        if (tab_slider(kAlerts[i].label, &v, lo, hi, shown(i == 4 ? kGaugeWays[v] : kWays[v]))) {
             PortA11y_SetAlertMode(i, v);
         }
         tab_tip(kAlerts[i].tip);
@@ -1743,6 +1770,14 @@ void A11yUi_Tab(void) {
             Port_SettingsWrite();
         }
         tab_tip(c.tip);
+    }
+    {
+        bool on = PortChat_Read() != 0;
+        if (ImGui::Checkbox(label_id("Read the online chat"), &on)) {
+            PortChat_ReadSet(on);
+            Port_SettingsWrite();
+        }
+        tab_tip("In an online match, the screen reader says each line the other player writes in the chat, with their name.");
     }
     ImGui::Spacing();
     // The sounds and what they mean: a button opens the list, a button for each plays it and says its meaning.

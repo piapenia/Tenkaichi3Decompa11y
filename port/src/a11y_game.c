@@ -3208,6 +3208,7 @@ static int subtitle(int first) {
 /* The message window's line, whenever it shows another one: once it has stayed TEXT_STABLE blanks, and not when a
    voice says it (the main menu's guides); queued behind the item it is about. */
 static void msg_window(void) {
+    extern int PortTbo_BoxQuiet(void); /* src/menu/port_tbo.c: the online pages' line said once elsewhere */
     static uint16_t GAME_PTR shown;
     static int first, done;
     A11yMsgWin GAME_PTR w = gMsgWin;
@@ -3229,6 +3230,8 @@ static void msg_window(void) {
     }
     if (subtitle(first)) {
         PortA11y_Note("message window: a voice says it");
+    } else if (PortTbo_BoxQuiet()) {
+        PortA11y_Note("message window: said elsewhere (online: the rival found, the match's banner)");
     } else if (PortA11y_Utf8(text, sizeof(text), (const uint16_t *)shown) > 0) {
         PortA11y_Say(text, 0);
     }
@@ -3513,7 +3516,8 @@ extern int BtlCharApi_GetHp(int objId), BtlCharApi_GetHpMax(int objId), BtlCharA
     BtlCharApi_GetBlast(int objId), BtlCharApi_GetBlastMax(int objId);
 extern int BtlSide_IsPoweredUp(int side), BtlSide_CountAlive(int side);
 extern int PortA11y_GaugesAsked(int fight); /* gs/a11y.c */
-extern int PortA11y_GaugesQuery(int side);  /* a11y_fight.c: the beeps; 2 set when the gauges are said too */
+extern int PortA11y_GaugesQuery(int side, int byItself); /* a11y_fight.c: the beeps; 2 set when the gauges are said too */
+extern int PortA11y_GaugesByItself(void);   /* a11y_fight.c: told as they change too, not only when asked for */
 extern void PortA11y_WhereQuery(void);      /* a11y_fight.c: where the rival is, a ping from there and its words */
 #define ASK_WHERE 3                         /* PortA11y_GaugesAsked: where the rival is (1, 2: a player's gauges) */
 extern void PortA11y_PowerCue(int side, int kind, int count); /* a11y_fight.c: the cue as a sound, the voice or both */
@@ -3541,32 +3545,13 @@ static void gauge_units(char *out, int cap, int value, int per) {
     }
 }
 
-/* The gauges of the player asked for (F3 / F4, or the touchpad click in a fight: gs/a11y.c), as the HUD shows them:
-   health and ki in bars, the blast stock, the powered-up mode and how many of a team are still up. */
-static void fight_gauges(void) {
-    static int shown;
-    int fight = fighting(), ask = PortA11y_GaugesAsked(fight && btl_menu_shown() == NULL), side = ask - 1, alive;
+/* A player's gauges as the HUD shows them: health and ki in bars, the blast stock, the powered-up mode and how many
+   of a team are still up. */
+static void gauges_say(int side, int flags) {
     char hp[16], hpMax[16], ki[16], text[256];
     size_t n;
+    int alive;
 
-    if (fight != shown) {
-        shown = fight;
-        PortA11y_Note(fight ? "gauges on screen" : "gauges gone");
-    }
-    if (ask == 0) {
-        return;
-    }
-    if (!fight) {
-        PortA11y_Note("gauges asked for outside a fight");
-        return;
-    }
-    if (ask == ASK_WHERE) {
-        PortA11y_WhereQuery();
-        return;
-    }
-    if (!(PortA11y_GaugesQuery(side) & 2)) {
-        return; /* (told by the beeps alone: a11y_fight.c) */
-    }
     gauge_units(hp, sizeof(hp), BtlCharApi_GetHp(side), GAUGE_HP_BAR);
     gauge_units(hpMax, sizeof(hpMax), BtlCharApi_GetHpMax(side), GAUGE_HP_BAR);
     gauge_units(ki, sizeof(ki), BtlCharApi_GetKi(side), GAUGE_KI_BAR);
@@ -3580,7 +3565,80 @@ static void fight_gauges(void) {
     if ((alive = BtlSide_CountAlive(side)) > 1 && n < sizeof(text)) {
         snprintf(text + n, sizeof(text) - n, tr(", %d fighters still up"), alive);
     }
-    PortA11y_Say(text, A11Y_INTERRUPT);
+    PortA11y_Say(text, flags);
+}
+
+/* The gauges told by themselves (the Accessibility tab's gauges "by itself too"): a player's, each time a whole bar
+   of health or of ki, or a blast stock, comes or goes and then holds half a second; at most every two seconds a
+   player, queued after what is being said. Yours all three; the rival's health and blast (its ki moves all the
+   time). A new fighter (a team's next, a transformation) is told as it comes. */
+static void gauges_auto(int fight) {
+    static int pend[2][3], said[2][3], held[2], next[2], blank, was;
+    int side, cur[3], any = 0, me = Port_NetActive() ? Port_NetMe() & 1 : 0;
+
+    if (!fight || !PortA11y_GaugesByItself()) {
+        was = 0;
+        return;
+    }
+    blank++;
+    for (side = 0; side < 2; side++) {
+        if (BtlCharApi_GetHpMax(side) <= 0) {
+            continue;
+        }
+        any = 1;
+        cur[0] = BtlCharApi_GetHp(side) / GAUGE_HP_BAR;
+        cur[1] = side == me ? BtlCharApi_GetKi(side) / GAUGE_KI_BAR : 0;
+        cur[2] = BtlCharApi_GetBlast(side) / GAUGE_BLAST;
+        if (!was) { /* (a fight starting: what the gauges are is not news) */
+            memcpy(pend[side], cur, sizeof(cur));
+            memcpy(said[side], cur, sizeof(cur));
+            held[side] = 0;
+            next[side] = blank + 120;
+            continue;
+        }
+        if (memcmp(cur, pend[side], sizeof(cur)) != 0) {
+            memcpy(pend[side], cur, sizeof(cur));
+            held[side] = 0;
+            continue;
+        }
+        if (++held[side] < 30 || memcmp(pend[side], said[side], sizeof(cur)) == 0 || blank < next[side]) {
+            continue;
+        }
+        memcpy(said[side], pend[side], sizeof(cur));
+        next[side] = blank + 120;
+        if (PortA11y_GaugesQuery(side, 1) & 2) {
+            gauges_say(side, 0);
+        }
+    }
+    was = was || any;
+}
+
+/* The gauges of the player asked for (F3 / F4, Select twice or three times, or the touchpad click in a fight:
+   gs/a11y.c), or by themselves as they change. */
+static void fight_gauges(void) {
+    static int shown;
+    int fight = fighting(), ask = PortA11y_GaugesAsked(fight && btl_menu_shown() == NULL), side = ask - 1;
+
+    if (fight != shown) {
+        shown = fight;
+        PortA11y_Note(fight ? "gauges on screen" : "gauges gone");
+    }
+    gauges_auto(fight && btl_menu_shown() == NULL);
+    if (ask == 0) {
+        return;
+    }
+    if (!fight) {
+        PortA11y_Note("gauges asked for outside a fight");
+        return;
+    }
+    if (ask == ASK_WHERE) {
+        PortA11y_WhereQuery();
+        return;
+    }
+    if (!(PortA11y_GaugesQuery(side, 0) & 2)) {
+        return; /* (told by the beeps alone: a11y_fight.c) */
+    }
+    gauges_say(side, A11Y_INTERRUPT);
 }
 
 /* ---- the fight's cues: a transformation or the Ultimate Blast within reach ---- */
