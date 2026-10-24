@@ -1,0 +1,102 @@
+# The accessible release (the fork piapenia/Tenkaichi3Decompa11y). A tag v<version>-a11y.<n> (v0.1.38.5-a11y.2) builds
+# the programs as release.yml does, with the screen reader's library (Prism) and the community's controller mappings
+# in the Windows archive, and publishes the release at once, not as a draft, with one download: the Windows archive,
+# ready to install and play,
+#     Tenkaichi3Decomp-a11y-<tag>-windows-x64.zip
+# and its link at the top of the notes. GitHub adds the source code to every release by itself ("Source code (zip)"
+# and "(tar.gz)"); the notes say that is not what is played. A tag with -test or -rc in it is published as a
+# pre-release. The Linux archive (no screen reader there yet) is kept as the run's artifact only.
+#
+#   a tag v*-a11y*            build, then publish (or, when the tag already has a release, replace its archive)
+#   "Run workflow" button     the same for a tag that exists (its name asked for): to build a release again
+name: accessible release
+
+on:
+  push:
+    tags: ["v*-a11y*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag to build and publish (it must exist)"
+        required: true
+
+permissions:
+  contents: write   # to publish the release
+
+concurrency:
+  group: release-a11y-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  # Prism, the screen reader's library (MPL-2.0, github.com/ethindp/prism): the release every accessible release has
+  # shipped, and the SHA-256 of its prism.dll (licenses/prism/SOURCE.txt of those releases). A newer Prism: both here.
+  PRISM_VERSION: "0.18.3"
+  PRISM_DLL_SHA256: "7c7d09c8c7306e8e1a0c46d603ccb2a391c194c77843400c11b746e7dd56a467"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      # The build container (port/release/Dockerfile), cached between runs as in release.yml. It carries the
+      # community's controller mappings at a fixed commit (BT3_GAMECONTROLLERDB), which package.py puts in the zip.
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: port/release
+          tags: bt3-port-release:jammy
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Prism
+        run: |
+          mkdir -p port/build/prism
+          curl -fsSL -o port/build/prism/prism-windows-x64.zip \
+            "https://github.com/ethindp/prism/releases/download/v${PRISM_VERSION}/prism-windows-x64.zip"
+          got=$(unzip -p port/build/prism/prism-windows-x64.zip dynamic/release/bin/prism.dll | sha256sum | cut -d' ' -f1)
+          echo "prism.dll ${PRISM_VERSION}: ${got}"
+          if [ "$got" != "$PRISM_DLL_SHA256" ]; then
+            echo "::error::prism.dll is not the one the accessible releases ship (expected ${PRISM_DLL_SHA256})"
+            exit 1
+          fi
+
+      - name: Build
+        run: |
+          mkdir -p port/build
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e BT3_PRISM=/src/port/build/prism/prism-windows-x64.zip \
+            -v "$PWD":/src -w /src bt3-port-release:jammy sh port/release/inside.sh
+          # (an archive without the reader's library, its instructions or the controllers' mappings is not published)
+          list=$(unzip -l port/build/Tenkaichi3Decomp-windows-x64.zip)
+          for f in prism.dll LEEME.txt README-accessibility.txt a11y_es.txt gamecontrollerdb.txt Tenkaichi3Decomp.exe Tenkaichi3Decomp-setup.exe; do
+            echo "$list" | grep -q "Tenkaichi3Decomp/$f\$" || { echo "::error::the Windows archive has no $f"; exit 1; }
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tenkaichi3Decomp-linux-x64
+          path: port/build/Tenkaichi3Decomp-linux-x64.zip
+          if-no-files-found: error
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zip="Tenkaichi3Decomp-a11y-${TAG}-windows-x64.zip"
+          cp port/build/Tenkaichi3Decomp-windows-x64.zip "$zip"
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${zip}"
+          sed -e "s|@ZIP@|${zip}|g" -e "s|@URL@|${url}|g" -e "s|@TAG@|${TAG}|g" port/release/a11y/release-notes.md > notes.md
+          pre=""
+          case "$TAG" in *-test*|*-rc*) pre="--prerelease" ;; esac
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$zip" --clobber
+            gh release edit "$TAG" --draft=false --notes-file notes.md $pre
+          else
+            gh release create "$TAG" "$zip" --title "Tenkaichi 3 accesible ${TAG#v}" --notes-file notes.md $pre
+          fi
+          echo "published: ${url}"

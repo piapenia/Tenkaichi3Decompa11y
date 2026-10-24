@@ -6,12 +6,13 @@
 #   every push to main        the archives as downloadable artifacts of the run (a check that everything builds)
 #   a tag  v*                 the same, and a draft release with both archives attached
 #   "Run workflow" button     the same as a push
+# (The accessible fork's tags, v*-a11y*, are release-a11y.yml's: one published release with the Windows archive.)
 name: release
 
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    tags: ["v*", "!v*-a11y*"]
     paths-ignore: ["docs/**", "**.md", "LICENSE", "LICENSE-MIT"]
   workflow_dispatch:
 
