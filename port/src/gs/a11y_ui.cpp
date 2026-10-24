@@ -39,6 +39,9 @@ int PortA11y_CueVolume(void);
 void PortA11y_SetCueVolume(int percent);
 int PortA11y_Voices(int fight); // a11y_game.c
 void PortA11y_SetVoices(int fight, int percent);
+int PortA11y_FightMusic(void);
+void PortA11y_SetFightMusic(int percent);
+void PortA11y_ApplyProfile(void); // a11y_fight.c: the blind player profile
 void Port_SettingsWrite(void); // plat_settings.c
 void Ui_Toggle(void); // ui.cpp: opens or closes the window (F1)
 const char *PortA11y_PadSourceName(int src); // a11y_pad.c: a controller button by the name of the one in use
@@ -1666,11 +1669,21 @@ void A11yUi_Tab(void) {
 
     ImGui::TextWrapped("%s", shown("Sounds and voices of the accessibility. The screen reader keeps its own volume: see the last button."));
     ImGui::Spacing();
+    // The blind player profile first (a11y_fight.c): what is recommended for playing without seeing, at once
+    if (ImGui::Button(label_id("Blind player profile: turn on what is recommended"))) {
+        PortA11y_ApplyProfile();
+        PortA11y_Say(shown("Blind player profile on."), A11Y_INTERRUPT);
+    }
+    tab_tip("Distance, edge and health by a sound; the important moments by the screen reader; a transformation, the\n"
+            "Ultimate Blast and the gauges on request by both; the cues at 85 and the music in fights at 70. Each one\n"
+            "can be changed below afterwards. With NVDA or JAWS this is done by itself the first time.");
+    ImGui::Spacing();
     v = PortA11y_CueVolume();
     if (tab_slider("Cue sounds", &v, 0, 100, "%d%%")) {
         PortA11y_SetCueVolume(v);
     }
-    tab_tip("The accessibility's sounds in a fight: the alerts below that are told by a sound. 0 turns them off.");
+    tab_tip("The accessibility's sounds in a fight: the alerts below that are told by a sound. A loudness scale: each\n"
+            "step of 10 is 3 dB, so 60 sounds half as loud as 100. 0 turns them off.");
     v = PortA11y_Voices(0);
     if (tab_slider("Game voices in menus", &v, 0, 100, "%d%%")) {
         PortA11y_SetVoices(0, v);
@@ -1681,6 +1694,12 @@ void A11yUi_Tab(void) {
         PortA11y_SetVoices(1, v);
     }
     tab_tip("The fighters' voices during a fight, under the screen reader.");
+    v = PortA11y_FightMusic();
+    if (tab_slider("Music in fights", &v, 0, 100, "%d%%")) {
+        PortA11y_SetFightMusic(v);
+    }
+    tab_tip("The music and the stage's background sound during a battle, so that the accessibility's sounds are heard\n"
+            "over them; 70 is about 3 dB under. The game's own music volume (Audio tab) stays as it is everywhere else.");
     ImGui::Spacing();
     // The fight's alerts (a11y_fight.c), each a slider over its ways of telling, so that the right stick changes it
     // as it does the volumes; the gauges asked for have no "Off" (they are only told when asked).
@@ -1689,15 +1708,17 @@ void A11yUi_Tab(void) {
         {"Distance to the rival", "A tick that repeats faster as the rival comes nearer, higher when the rival is above\n"
                                   "you and lower when below; two ticks within close range. By the screen reader: near,\n"
                                   "middle distance or far, and above or below, when it changes."},
-        {"Edge of the stage", "A hum while you are near the stage's wall (where the game shows it), faster the nearer;\n"
-                              "another under the stage's ceiling, and two knocks out of the World Tournament ring."},
+        {"Edge of the stage", "A gust of wind while you are near the stage's wall (where the game shows it), faster the\n"
+                              "nearer; a high hiss under the stage's ceiling, and two knocks out of the World Tournament ring."},
         {"Health", "Two beeps when a player's health falls under three quarters, a half and a quarter, louder the\n"
-                   "less is left; under a quarter, yours again every three seconds. Player 1 left, player 2 right."},
+                   "less is left; under a quarter, yours again every three seconds. In the middle: yours clean, the\n"
+                   "rival's with a buzz."},
         {"Transformation and Ultimate Blast", "When one more transformation or the Ultimate Blast comes within reach."},
-        {"Gauges on request", "Select alone in a fight (Create on a DualSense, View on an Xbox controller): your gauges;\n"
-                              "Select twice quickly: the rival's. F3 and F4 on the keyboard: player 1's and player 2's.\n"
-                              "Two beeps, louder the less health is left, or health, ki and blast said by the screen\n"
-                              "reader, or both. Outside a fight, Select says the last message again."},
+        {"Gauges on request", "Select in a fight (Create on a DualSense, View on an Xbox controller): once, where the rival is, a ping\n"
+                              "from there and a few words; twice quickly, your gauges; three times, the rival's. F5 on the keyboard: where\n"
+                              "the rival is; F3 and F4: player 1's and player 2's gauges. The gauges as two beeps (yours clean, the\n"
+                              "rival's with a buzz), or health, ki and blast said by the screen reader, or both. Outside a fight, Select\n"
+                              "says the last message again."},
         {"Important moments", "Told by themselves, for both players: health down to two bars and then to one, the ki\n"
                               "full, max power. By the screen reader, by a sound (two beeps for health, three notes\n"
                               "going up for the ki, higher for max power), or both."},
