@@ -254,6 +254,15 @@ const char *const kPatterns[] = {
     "Stopped: %s",
     "by %s",
     "Folder: %s/%s Uses:%s%s%s",
+    // (why an update was not installed, gs/net_update.c: said inside "The update to %s was not installed: %s")
+    "%s Everything was put back: this version goes on as it was.",
+    "The download is incomplete (%d of %d bytes). Try again later.",
+    "The game's folder cannot be written to (%s): update it by hand.",
+    "The folder of %s could not be made (%s).",
+    "The archive's %s could not be unpacked.",
+    "%s could not be written (%s).",
+    "%s could not be renamed (%s).",
+    "%s could not be put in place (%s).",
 };
 // Texts one of them would take too, that have a line of their own
 const char *const kNotPatterns[] = {"Keypad Enter", "Looking for the lobby..."};
@@ -425,6 +434,7 @@ bool data_parts(const char *cap, int len, char *out, int size) {
 
 // A text the window draws, in the language spoken. 1: it was found.
 bool tr(const char *en, char *out, int size) {
+    static int depth; // (a conversion that is a sentence itself: below)
     const char *cap[8], *t;
     int capLen[8], n;
     bool own = false;
@@ -444,11 +454,23 @@ bool tr(const char *en, char *out, int size) {
     }
     for (int i = 0; !own && i < (int)(sizeof(kPatterns) / sizeof(kPatterns[0])); i++) {
         if ((n = 0, match(kPatterns[i], en, cap, capLen, &n))) {
-            char parts[8][160];
+            char parts[8][320];
             for (int k = 0; k < n; k++) {
                 if (data_parts(cap[k], capLen[k], parts[k], sizeof(parts[k]))) {
                     cap[k] = parts[k];
                     capLen[k] = (int)strlen(parts[k]);
+                } else if (depth < 3 && capLen[k] < (int)sizeof(parts[k]) && memchr(cap[k], ' ', capLen[k]) != NULL) {
+                    // A sentence of its own (the reason an update failed): in the language too, when it has a line
+                    char part[320];
+                    bool said;
+                    snprintf(part, sizeof(part), "%.*s", capLen[k], cap[k]);
+                    depth++;
+                    said = tr(part, parts[k], sizeof(parts[k]));
+                    depth--;
+                    if (said) {
+                        cap[k] = parts[k];
+                        capLen[k] = (int)strlen(parts[k]);
+                    }
                 }
             }
             t = lang_line(kPatterns[i]);
@@ -2152,4 +2174,33 @@ void A11yUi_UpstreamEnd(int open) {
     sUpstream = open && sReading;
     sUpstreamItems = sCount;
     g.TestEngineHookItems = sReading;
+}
+
+// What the screen reader says for a line of Port_UiBanner (gs/ui.cpp), in its language; NULL when it is the line it
+// said last with other numbers in it ("Catching up with the match... 37%", gs/net.c: a new line every percent, which
+// would be said a hundred times). NULL in: the line went, the next one is new.
+extern "C" const char *PortA11y_Label(const char *label); // a11y.c
+extern "C" const char *PortA11yUi_Banner(const char *text) {
+    static char sLast[256];
+    char bare[256];
+    int n = 0;
+
+    if (text == NULL) {
+        sLast[0] = '\0';
+        return NULL;
+    }
+    for (const char *p = text; *p && n < (int)sizeof(bare) - 1; p++) {
+        if ((*p < '0' || *p > '9') && *p != '%') {
+            bare[n++] = *p;
+        }
+    }
+    while (n > 0 && (bare[n - 1] == ' ' || bare[n - 1] == '.')) {
+        n--;
+    }
+    bare[n] = '\0';
+    if (strcmp(bare, sLast) == 0) {
+        return NULL;
+    }
+    snprintf(sLast, sizeof(sLast), "%s", bare);
+    return strcmp(bare, text) != 0 && strncmp(text, "Catching up", 11) == 0 ? PortA11y_Label("Catching up with the match") : PortA11y_Label(text);
 }

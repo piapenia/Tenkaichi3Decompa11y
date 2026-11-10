@@ -325,8 +325,13 @@ extern A11yDuelMenu GAME_PTR gDuelMenu;
    each side (two words) and stage destruction; each is the row of its value list. */
 typedef struct {
     unsigned char cleared;        /* 0x0 */
-    char unk1[0xC - 1];
-} A11yMissionRecord;               /* include/menu/menu_p.h: PSaveMission */
+    unsigned char rank;           /* 0x1: the best rank, a column of the rank strip (kRankLetter) */
+    unsigned char hours, minutes, seconds; /* 0x2: the best time (src/menu/menu_o_d.c MisSel_Draw) */
+    char unk5[3];
+    int score;                    /* 0x8: shown * 100 */
+} A11yMissionRecord;               /* include/menu/menu_p.h: PSaveMission; include/menu/menu_o.h: UoMissionRec */
+/* A rank's letter as the strips draw it (menu_p_b.c; menu_o_d.c MisSel_SetRank; column 0 is a dash). */
+static const char kRankLetter[5] = {'-', 'C', 'B', 'A', 'Z'};
 
 typedef struct {
     int defeated;                    /* opponents beaten */
@@ -627,6 +632,52 @@ static void ub_menu(void) {
     }
 }
 
+/* The top menus of Evolution Z (mode 48, EvoTop: src/menu/menu_w_c.c) and of the Data Center (mode 53, DcMenu:
+   src/menu/menu_z_c.c): three plates each, drawn as pictures, with a guide who speaks. Their work structures are
+   locals of their Run functions, so nothing points at them: each one's Draw gives its cursor here every frame it
+   draws (PortA11y_Plate), and plates() says the plate when it changes. The names are descriptions of where each
+   plate leads (EvoTop_Input: the customising screen, the shop, the guide's explanation; include/menu/menu_z.h:
+   password, character list, replay), not yet checked against the plates' pictures. */
+#define PLATE_SCREENS 2
+#define PLATE_COUNT 3
+static const char *const kPlateNames[PLATE_SCREENS][PLATE_COUNT] = {
+    {"Customize characters", "Item shop", "About Evolution Z"},
+    {"Passwords", "Saved characters", "Replays"},
+};
+static struct {
+    int cursor, busy, blank; /* as last given, and the blank it was given on (0: never) */
+} sPlate[PLATE_SCREENS];
+
+static int sOn;    /* (defined with the tick, below) */
+static int sBlank;
+
+void PortA11y_Plate(int screen, int cursor, int busy) {
+    if (!sOn || gPortResim || screen < 0 || screen >= PLATE_SCREENS) {
+        return;
+    }
+    sPlate[screen].cursor = cursor;
+    sPlate[screen].busy = busy != 0;
+    sPlate[screen].blank = sBlank;
+}
+
+static void plates(void) {
+    static int item[PLATE_SCREENS] = {-1, -1};
+    int s, cur;
+
+    for (s = 0; s < PLATE_SCREENS; s++) {
+        if (sPlate[s].blank == 0 || sBlank - sPlate[s].blank > 4) { /* (not drawn lately: the screen is gone) */
+            item[s] = -1;
+            continue;
+        }
+        cur = sPlate[s].cursor;
+        if (sPlate[s].busy || cur < 0 || cur >= PLATE_COUNT || cur == item[s]) {
+            continue;
+        }
+        say_item(tr(kPlateNames[s][cur]), cur, PLATE_COUNT, follow());
+        item[s] = cur;
+    }
+}
+
 /* include/menu/menu_o.h: DiscFusion (src/menu/menu_o_b.c), the Disc Fusion screen of mode 24: two plates, one per
    earlier game's disc, with text line 0x15A + disc (0x15C + disc once that disc was read: DiscFusion_Init) of the
    screen's own text. Its disc swap asks through the Dialog, read by dialog(). */
@@ -750,7 +801,11 @@ static void mission_select(void) {
             n += snprintf(text + n, sizeof(text) - n, ", %s", line);
         }
         if (gSaveData != NULL && gSaveData->mission[cur].cleared) {
-            snprintf(text + n, sizeof(text) - n, "%s", tr(", cleared"));
+            n += snprintf(text + n, sizeof(text) - n, "%s", tr(", cleared"));
+        }
+        /* (the row's rank letter is a picture: MisSel_SetRank) */
+        if (gSaveData != NULL && gSaveData->mission[cur].rank >= 1 && gSaveData->mission[cur].rank <= 4) {
+            snprintf(text + n, sizeof(text) - n, tr(", rank %c"), kRankLetter[gSaveData->mission[cur].rank]);
         }
     } else {
         if (m->missions == NULL || m->opps == NULL) {
@@ -766,8 +821,14 @@ static void mission_select(void) {
         for (i = 0; i < 5 && (unsigned)def->opp[i] < MISSEL_OPPS_MAX && m->opps[def->opp[i]].chara != MISSEL_NONE; i++) {
             opps++;
         }
-        snprintf(text + n, sizeof(text) - n, "%d %s", opps,
-                 tr(opps == 1 ? "opponent" : "opponents"));
+        n += snprintf(text + n, sizeof(text) - n, "%d %s", opps,
+                      tr(opps == 1 ? "opponent" : "opponents"));
+        /* (the best time and score are numbers drawn as pictures: MisSel_Draw) */
+        if (gSaveData != NULL && gSaveData->mission[cur].score > 0) {
+            snprintf(text + n, sizeof(text) - n, tr(". Best: time %d:%02d:%02d, score %d"),
+                     gSaveData->mission[cur].hours, gSaveData->mission[cur].minutes,
+                     gSaveData->mission[cur].seconds, gSaveData->mission[cur].score * 100);
+        }
     }
     PortA11y_Say(text, follow());
     level = m->level;
@@ -3283,7 +3344,7 @@ static const struct {
     {30, -1, "Result"},
     {33, 2, NULL},
     {35, -1, "Tournament bracket"},
-    {40, -1, "Team select, not read yet"},
+    {40, -1, "Team select"},
     {44, 6, NULL},
     {48, 5, NULL},
     {53, 7, NULL},
@@ -3481,8 +3542,6 @@ typedef struct {
 } A11yScore;
 LAYOUT_ASSERT(sizeof(A11yScore) == 0x2A8 && offsetof(A11yScore, bonus) == 0x40 && offsetof(A11yScore, lineCount) == 0x28C &&
               offsetof(A11yScore, hours) == 0x298 && offsetof(A11yScore, rank) == 0x2A4, "UbScore");
-/* The rank's letter as the strip draws it (menu_p_b.c; column 0 is a dash). */
-static const char kRankLetter[5] = {'-', 'C', 'B', 'A', 'Z'};
 extern uint8_t GAME_PTR gMisResult;  /* src/menu/menu_p_b.c; each NULL outside its screen */
 extern uint8_t GAME_PTR gSurvResult; /* menu_s_c.c */
 extern uint8_t GAME_PTR gSimResult;  /* menu_r_c.c */
@@ -4293,6 +4352,7 @@ void PortA11y_GameTick(void) {
     solo_select();
     entry_select();
     ub_menu();
+    plates();
     mission_select();
     tour_menu();
     hist_select();

@@ -323,8 +323,6 @@ fdcee8c41fbd3c80	Sim Dragón, jornada
 69c73414fc4e34d4	Elige un recorrido
 # Tournament bracket
 b38d54b8751d04b6	Cuadro del torneo
-# Team select, not read yet
-8bf44dc7ccd81bf5	Selección por equipos, todavía sin lectura
 # opponent
 90eaf167ae67e404	rival
 # opponents
@@ -2705,3 +2703,139 @@ a84ae7f1cd7cd90c	Mods con scripts: scripts de Lua en la carpeta "%s" junto al ju
 08632c48ec96c7f8	Autor: %s
 # Folder: %s/%s Uses:%s%s%s
 84a20807c097273a	Carpeta: %s/%s. Usa:%s%s%s
+# , rank %c
+6034e3af0d5187fd	, rango %c
+# . Best: time %d:%02d:%02d, score %d
+de16bf5d0d0e3b7a	. Mejor marca: tiempo %d:%02d:%02d, puntaje %d
+# Customize characters
+42231fb21eb6867c	Personalizar personajes
+# About Evolution Z
+24ff10abc8711b3d	Acerca de Evolución Z
+# Passwords
+a3a27a128ad87f31	Contraseñas
+# Saved characters
+aa0b315242f4a9c0	Personajes guardados
+# Catching up with the match
+d60a61e20e66bfc9	Alcanzando la partida
+# %s Everything was put back: this version goes on as it was.
+c39d5444eb0e5f9e	%s Se dejó todo como estaba: esta versión sigue igual.
+# The download is incomplete (%d of %d bytes). Try again later.
+bd06f55097f3d582	La descarga quedó incompleta (%d de %d bytes). Probá de nuevo más tarde.
+# The game's folder cannot be written to (%s): update it by hand.
+d47ed5f2e2afe313	No se puede escribir en la carpeta del juego (%s): actualizalo a mano.
+# The folder of %s could not be made (%s).
+f4f37f6bcc41085e	No se pudo crear la carpeta de %s (%s).
+# The archive's %s could not be unpacked.
+66833f2f0ea5de16	No se pudo descomprimir %s del archivo.
+# %s could not be written (%s).
+6ec47ea496989be2	No se pudo escribir %s (%s).
+# %s could not be renamed (%s).
+1038d26a051344ff	No se pudo cambiar el nombre de %s (%s).
+# %s could not be put in place (%s).
+b8a533f8a3065c06	No se pudo poner %s en su lugar (%s).
+# The download failed (no connection, or it was cut off). Try again later.
+8e75da0d3da31f26	La descarga falló (no hay conexión, o se cortó). Probá de nuevo más tarde.
+# The downloaded archive could not be read back.
+8fccb60cee042c6b	No se pudo volver a leer el archivo descargado.
+# The download is damaged: its SHA-256 is not the one GitHub lists for it. Try again later.
+2e57a4c77c45e3b4	La descarga está dañada: no coincide con la que publica GitHub. Probá de nuevo más tarde.
+# The downloaded archive could not be kept in the update folder.
+a67813a028ad3a97	No se pudo guardar el archivo descargado en la carpeta de actualización.
+# The download could not be started.
+461dfc7ddabd7926	No se pudo empezar la descarga.
+# The downloaded archive could not be read again, or it changed since it was checked. Nothing was changed.
+add05c1cd69a6acd	No se pudo volver a leer el archivo descargado, o cambió después de revisarlo. No se cambió nada.
+# The install could not be started.
+63d1a8250de79d91	No se pudo empezar la instalación.
+# Modern camera
+81b4c010614d788d	Cámara moderna
+# Modern HUD
+0da6e24c17f93f43	Indicadores modernos
+# Modern look
+f9ab3e3534b1a715	Aspecto moderno
+# Skill list
+c61c8e5199405ede	Lista de técnicas
+# Opacity
+ba64d8954d027206	Opacidad
+# Draw the timer
+50df0f21a08379f9	Dibujar el reloj
+# Off: the game's own timer stays.
+3d182d4e92e5c200	Apagado: queda el reloj del juego.
+# Draw the combo counter
+0d5967a57b0a864a	Dibujar el contador de combos
+# Off: the game's own counter and messages stay.
+a11ae3701bd62161	Apagado: quedan el contador y los mensajes del juego.
+# Show portraits
+e2095ea30a0ad704	Mostrar retratos
+# The fighters' portraits in the top corners.
+0e2de52aac0a8fe2	Los retratos de los luchadores en las esquinas de arriba.
+# Anime shading
+1fcd52aebc7cec25	Sombreado de anime
+# Cool coloured shadows with a soft edge on the fighters.
+eb0531e8b9456318	Sombras de color frío con borde suave sobre los luchadores.
+# Rim light
+82e7438e321e07eb	Luz de contorno
+# Light along the fighters' silhouettes.
+a5320d306aaebfe1	Luz a lo largo de la silueta de los luchadores.
+# Rim light colour
+4e91dfef024b2dc9	Color de la luz de contorno
+# Warm white
+d8d1cfb3cc0e5c45	Blanco cálido
+# Cool white
+4b64c84750e4a9c1	Blanco frío
+# Gold
+c416c97e0d3218b3	Dorado
+# Cyan
+9b3c2f9cc32d565a	Cian
+# Vivid colours
+5cdc939a480a3bc2	Colores vivos
+# Livelier colours and a neutral balance (GPU renderer).
+72289ed65a8d0691	Colores más vivos y un balance neutro (dibujo por GPU).
+# Ambient shadows
+f8df7e0278af19f2	Sombras de ambiente
+# Soft shadows in corners and at the foot of things (GPU renderer).
+83d380d7dc269a32	Sombras suaves en los rincones y al pie de las cosas (dibujo por GPU).
+# Brighter energy
+a215c7c1b75e0c0a	Energía más brillante
+# Ki blasts, beams and sparks stronger and more saturated.
+52e8cb0029745b6a	Ráfagas de ki, rayos y chispas más fuertes y saturados.
+# Energy light
+ac1128273c38fe29	Luz de la energía
+# Energy lights up the ground and fighters round it (GPU renderer).
+8812d31cd9811187	La energía ilumina el suelo y a los luchadores cercanos (dibujo por GPU).
+# Anime shading, rim light, vivid colours, ambient shadows and glowing energy.
+39252398004b2d8d	Sombreado de anime, luz de contorno, colores vivos, sombras de ambiente y energía que brilla.
+# Inertia
+5bdb12e0ab3becf1	Inercia
+# 0: the game's camera exactly. 100: about a third of a second to settle.
+7781689cf37fea27	0: la cámara del juego tal cual. 100: tarda cerca de un tercio de segundo en acomodarse.
+# Tilt in turns
+ca18379b49d21025	Inclinación en los giros
+# Hit reactions
+9182186c1c2df8d6	Reacción a los golpes
+# The shake and push in when a hit is taken or landed.
+d402833f51f06410	El temblor y el acercamiento cuando se recibe o se da un golpe.
+# Distance
+30d8afddc9716922	Distancia
+# Farther (+) or nearer (-) than the game's camera.
+bae1b41c61b3bd22	Más lejos (+) o más cerca (-) que la cámara del juego.
+# Height
+ffdadf0a576fd802	Altura
+# Higher (+) or lower (-) than the game's camera, the fighter kept where it was in the picture.
+e9744931f276c376	Más alta (+) o más baja (-) que la cámara del juego, con el luchador en el mismo lugar de la imagen.
+# Zoom
+166bd56d19670a72	Zoom
+# Size
+78789724e789221c	Tamaño
+# Always shown
+1005434a1f543211	Siempre a la vista
+# Show the list all the time, not only while charge is held.
+982d6128d1d265e5	Muestra la lista todo el tiempo, no solo mientras se mantiene la carga.
+# Show buttons
+eee7946ff684b639	Mostrar botones
+# The buttons (and stick directions) that use each move, beside it.
+241037c495608bfa	Al lado de cada movimiento, los botones (y direcciones de la palanca) que lo hacen.
+# While charge is held: your skills and specials with their buttons and costs, at the bottom corner.
+2075fca505ff2c9b	Mientras se mantiene la carga: tus técnicas y especiales con sus botones y costos, en la esquina de abajo.
+# The release's signature (Tenkaichi3Decomp-windows-x64.zip.sig) could not be downloaded or read. Try again later.
+66f0fb917481dc60	No se pudo descargar o leer la firma de la versión. Probá de nuevo más tarde.

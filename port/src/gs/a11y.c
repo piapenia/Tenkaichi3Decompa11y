@@ -98,7 +98,7 @@ static FILE *open_utf8(const char *path, const char *mode) {
 
 #define A11Y_INTERRUPT 1 /* (the same in a11y_game.c) */
 #define A11Y_TEXT 1024
-#define A11Y_QUEUE 8
+#define A11Y_QUEUE 32
 
 /* ---- Prism's C interface: the part used here (include/prism.h of release 0.18.3) ---- */
 
@@ -321,7 +321,13 @@ static void push(const char *text, int interrupt) {
         sCount = 0;
     }
     if (sCount == A11Y_QUEUE) {
-        return;
+        /* Full: the oldest waiting line goes, not the new one (what is said should be what is true now), and the
+           log keeps what was lost. */
+        if (sLog != NULL) {
+            fprintf(sLog, "%d dropped: %s\n", sFrame, sQueue[sHead].text);
+        }
+        sHead = (sHead + 1) % A11Y_QUEUE;
+        sCount--;
     }
     k = (sHead + sCount) % A11Y_QUEUE;
     snprintf(sQueue[k].text, sizeof(sQueue[k].text), "%s", text);

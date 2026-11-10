@@ -104,6 +104,7 @@ const char *Port_NetWatcher(int i);                          // ... their names
 void A11yUi_Init(void); int A11yUi_Tabs(void); void A11yUi_Tab(void); // a11y_ui.cpp: the window read aloud, its own tab
 int A11yUi_InRegion(void); // a11y_ui.cpp: the focus is in a region (the bindings table): Circle leaves it, not the window
 void A11yUi_UpstreamEnd(int open); // a11y_ui.cpp: ui_a11y.cpp has read the windows built so far (open: it was on)
+extern "C" const char *PortA11yUi_Banner(const char *text); // a11y_ui.cpp: what is said for a banner line, NULL nothing
 static bool sReady, sOpen;
 static MenuTranslationOption sLanguages[256];
 static int sLanguageCount, sLanguageChoice;
@@ -2582,7 +2583,7 @@ static char sBanner[256];
 static Uint64 sBannerUntil; // 0: while the game waits
 static void banner(const char *text, const char *said, int ms) {
     if (text != NULL) {
-        if (strcmp(sBanner, text) != 0) { // (said once per line: the game's thread calls this again while it waits)
+        if (strcmp(sBanner, text) != 0 && said != NULL) { // (said once per line: the game's thread calls this again while it waits)
             PortA11y_Say(said, 1);
         }
         SDL_strlcpy(sBanner, text, sizeof(sBanner));
@@ -2595,7 +2596,7 @@ static void banner(const char *text, const char *said, int ms) {
 
 // The line said in the screen reader's language (port/lang/a11y_<code>.txt).
 extern "C" void Port_UiBanner(const char *text, int ms) {
-    banner(text, text != NULL ? PortA11y_Label(text) : NULL, ms);
+    banner(text, PortA11yUi_Banner(text), ms); // BT3 a11y: in its language, a progress line once (a11y_ui.cpp)
 }
 
 // A line with a name in it: what the screen reader says, made by the caller in the reader's language.
