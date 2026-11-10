@@ -4322,6 +4322,599 @@ static void welcome(void) {
 }
 
 /* Once per blank (plat_stub.c: Port_VBlank). */
+/* The day of Dragon Sim (mode 22, SimDay: src/menu/menu_q_b.c, include/menu/menu_q.h). The command under the cursor
+   and the results are said through the message window; the board's numbers are pictures. They are said when the
+   board comes back with a number changed, after it has stopped rolling. */
+typedef struct {
+    char unk0[0x590];
+    int state;        /* 0x590: SIMDAY_ST_ */
+} A11ySimDay;
+LAYOUT_ASSERT(offsetof(A11ySimDay, state) == 0x590, "SimDay");
+extern A11ySimDay GAME_PTR gSimDay;
+#define SIMDAY_ST_BOARD 0
+#define SIM_STATE_WORD (0x64C / 4) /* SimState in gProgress: level, stat[4] (attack, defense, health, points) ... */
+#define SIM_TURN_WORD 10           /* SimState.turn: / 10 the round, % 10 the day */
+#define SIM_TURNS 10
+#define SIM_VALUES 6
+#define SIM_SETTLE 20
+
+static void sim_day(void) {
+    static int said[SIM_VALUES], prev[SIM_VALUES], settle, first = 1;
+    static const char *const kSimValue[SIM_VALUES] = {
+        NULL, "Health %d percent", "Attack %d", "Defense %d", "%d points", "Level %d",
+    };
+    A11ySimDay GAME_PTR d = gSimDay;
+    int GAME_PTR s;
+    char text[A11Y_TEXT];
+    int now[SIM_VALUES], i, changed = 0, moved = 0;
+    size_t len = 0;
+
+    if (d == NULL || gProgress == NULL) {
+        first = 1;
+        settle = 0;
+        return;
+    }
+    if (d->state != SIMDAY_ST_BOARD) {
+        settle = 0;
+        return;
+    }
+    s = (int GAME_PTR)gProgress + SIM_STATE_WORD;
+    now[0] = s[SIM_TURN_WORD];
+    now[1] = s[3];
+    now[2] = s[1];
+    now[3] = s[2];
+    now[4] = s[4] * 100;
+    now[5] = s[0] + 1;
+    for (i = 0; i < SIM_VALUES; i++) {
+        if (now[i] != prev[i]) {
+            moved = 1;
+        }
+        if (first || now[i] != said[i]) {
+            changed |= 1 << i;
+        }
+        prev[i] = now[i];
+    }
+    if (moved) {
+        settle = 0;
+    }
+    if (changed == 0 || now[0] < 0 || now[0] > 9999 || ++settle < SIM_SETTLE) {
+        return;
+    }
+    text[0] = '\0';
+    if (changed & 1) {
+        len = (size_t)snprintf(text, sizeof(text), tr("Day %d of %d"), now[0] % SIM_TURNS + 1, SIM_TURNS);
+        if (now[0] >= SIM_TURNS && len < sizeof(text)) {
+            len += (size_t)snprintf(text + len, sizeof(text) - len, tr(", round %d"), now[0] / SIM_TURNS + 1);
+        }
+    }
+    for (i = 1; i < SIM_VALUES; i++) {
+        if ((changed & (1 << i)) && len < sizeof(text) - 4) {
+            if (len > 0) {
+                len += (size_t)snprintf(text + len, sizeof(text) - len, ". ");
+            }
+            len += (size_t)snprintf(text + len, sizeof(text) - len, tr(kSimValue[i]), now[i]);
+        }
+    }
+    for (i = 0; i < SIM_VALUES; i++) {
+        said[i] = now[i];
+    }
+    first = 0;
+    PortA11y_Say(text, 0); /* behind the command's line */
+}
+
+/* The team of Ultimate Battle (UbTeamSel: src/menu/menu_m_b.c, include/menu/menu_m.h), shown instead of SoloSel when
+   the course asks for two fighters or more. Its state is the team select's side record. */
+typedef struct {
+    char unk0[0x14];
+    uint32_t GAME_PTR nameText;   /* 0x0014 */
+    uint32_t GAME_PTR formText;   /* 0x0018 */
+    char unk1C[0x1EC - 0x1C];
+    int flags;                    /* 0x01EC: UBSEL_ */
+    char unk1F0[0x200 - 0x1F0];
+    A11yTeamSide state;           /* 0x0200: UbTeamState */
+    char unk340[0x1AB8 - 0x340];
+    int rows;                     /* 0x1AB8 */
+    int plateCount;               /* 0x1ABC */
+    int colorCount;               /* 0x1AC0 */
+    int teamMax;                  /* 0x1AC4: fighters the team may have */
+    int dpLevel;                  /* 0x1AC8 */
+    int dpMax;                    /* 0x1ACC: 10, 15 or 20 */
+} A11yUbTeamSel;
+LAYOUT_ASSERT(offsetof(A11yUbTeamSel, flags) == 0x1EC && offsetof(A11yUbTeamSel, state) == 0x200 &&
+               offsetof(A11yUbTeamSel, rows) == 0x1AB8 && offsetof(A11yUbTeamSel, dpMax) == 0x1ACC, "UbTeamSel");
+extern A11yUbTeamSel GAME_PTR gUbTeamSel;
+extern int ChrTbl_GetCost(int chara); /* src/battle/view_b_b.c: reads the character table */
+#define UBSEL_STARTED 2
+#define UBSEL_DONE 8
+#define UBSEL_LEAVING 0x10
+#define UBSEL_DP 0x20
+
+/* Appends the character's cost when the team has a DP limit. */
+static void ub_add_cost(char *text, int cap, A11yUbTeamSel GAME_PTR t, int chara) {
+    size_t len = strlen(text);
+
+    if ((t->flags & UBSEL_DP) && chara >= 0 && chara < MCHR_RANDOM && (int)len < cap) {
+        snprintf(text + len, cap - len, tr(", %d DP"), ChrTbl_GetCost(chara));
+    }
+}
+
+static void ub_team_select(void) {
+    static int open, step, pos, row, chara, cur;
+    A11yUbTeamSel GAME_PTR t = gUbTeamSel;
+    A11yTeamSide GAME_PTR s;
+    A11yTsMember GAME_PTR mb;
+    char text[A11Y_TEXT], what[A11Y_TEXT];
+    int p = 0, count = 0, c;
+    size_t len;
+
+    if (t == NULL) {
+        open = 0;
+        return;
+    }
+    if (!(t->flags & UBSEL_STARTED) || (t->flags & (UBSEL_DONE | UBSEL_LEAVING))) {
+        return;
+    }
+    s = &t->state;
+    if (s->state < TEAMSEL_ST_GRID || s->state > TEAMSEL_ST_TEAM || s->cur < 0 || s->cur > TS_CUR_MENU) {
+        return;
+    }
+    if (!open) {
+        open = 1;
+        step = pos = row = chara = cur = -1;
+        len = (size_t)snprintf(text, sizeof(text), "%s", tr("Team select"));
+        if (t->teamMax >= 2 && t->teamMax <= TS_MEMBERS && len < sizeof(text)) {
+            len += (size_t)snprintf(text + len, sizeof(text) - len, tr(". Fighters: %d"), t->teamMax);
+        }
+        if ((t->flags & UBSEL_DP) && len < sizeof(text)) {
+            snprintf(text + len, sizeof(text) - len, tr(". DP limit: %d"), t->dpMax);
+        }
+        heading(text);
+    }
+    mb = &s->member[s->cur < TS_MEMBERS ? s->cur : 0];
+    c = s->chara;
+    what[0] = '\0';
+    switch (s->state) {
+    case TEAMSEL_ST_GRID:
+        p = mb->col;
+        chara_name(what, sizeof(what), t->nameText, t->formText, c);
+        ub_add_cost(what, sizeof(what), t, c);
+        if ((step != s->state || mb->row != row) && t->rows > 1) {
+            len = strlen(what);
+            snprintf(what + len, sizeof(what) - len, tr(", row %d of %d"), mb->row + 1, t->rows);
+        }
+        break;
+    case TEAMSEL_ST_FORM:
+        p = mb->form;
+        chara_name(what, sizeof(what), t->nameText, t->formText, c);
+        ub_add_cost(what, sizeof(what), t, c);
+        break;
+    case TEAMSEL_ST_PLATE:
+        p = mb->plate;
+        count = t->plateCount;
+        if (p == 0) {
+            snprintf(what, sizeof(what), "%s", tr("No items"));
+        } else {
+            snprintf(what, sizeof(what), tr("Item set %d"), p);
+        }
+        break;
+    case TEAMSEL_ST_PANEL:
+        snprintf(what, sizeof(what), "%s", tr("Item panel"));
+        break;
+    case TEAMSEL_ST_PANEL_HELP: /* the item's description window */
+        step = s->state;
+        return;
+    case TEAMSEL_ST_COLOR:
+        p = mb->color;
+        count = t->colorCount;
+        snprintf(what, sizeof(what), tr("Costume %d"), p + 1);
+        break;
+    case TEAMSEL_ST_TEAM:
+        c = -1;
+        if (s->cur == TS_CUR_MENU) {
+            snprintf(what, sizeof(what), "%s", tr("Confirm the team"));
+            p = -1;
+        } else {
+            p = s->cur;
+            count = t->teamMax >= 1 && t->teamMax <= TS_MEMBERS ? t->teamMax : TS_MEMBERS;
+            if (s->cur < s->memberCount && mb->chara >= 0) {
+                c = mb->chara;
+                len = (size_t)snprintf(what, sizeof(what), tr("Member %d: "), s->cur + 1);
+                chara_name(what + len, sizeof(what) - len, t->nameText, t->formText, c);
+                ub_add_cost(what, sizeof(what), t, c);
+            } else {
+                snprintf(what, sizeof(what), tr("Member %d: empty"), s->cur + 1);
+            }
+        }
+        break;
+    }
+    if (s->state == step && p == pos && mb->row == row && c == chara && s->cur == cur) {
+        return;
+    }
+    add_position(what, sizeof(what), p, count);
+    if (s->state == TEAMSEL_ST_TEAM && step != TEAMSEL_ST_TEAM && (t->flags & UBSEL_DP)) {
+        len = strlen(what);
+        snprintf(what + len, sizeof(what) - len, tr(". Team DP: %d of %d"), s->cost, t->dpMax);
+    }
+    if (s->state != TEAMSEL_ST_TEAM && s->cur != cur && s->cur < TS_MEMBERS) {
+        snprintf(text, sizeof(text), tr("Member %d: %s"), s->cur + 1, what);
+        snprintf(what, sizeof(what), "%s", text);
+    }
+    step = s->state;
+    pos = p;
+    row = mb->row;
+    chara = c;
+    cur = s->cur;
+    PortA11y_Say(what, follow());
+}
+
+/* The password entry of the Data Center (mode 54, DcPass: src/menu/menu_z_d.c, include/menu/menu_z.h). Its work
+   structure is a local of DcPass_Run, so its loop gives a copy here every frame (PortA11y_DcPass), as the plates
+   above do. The guide's lines are said through the message window. */
+typedef struct {
+    char unk0[0x85C];
+    uint32_t GAME_PTR nameText;   /* 0x85C: view.nameText */
+    uint32_t GAME_PTR formText;   /* 0x860 */
+    char unk864[4];
+    char text[35];                /* 0x868: 34 cells, ' ' = empty */
+    char pass[0x25];              /* 0x88B */
+    int cursor;                   /* 0x8B0: cell the next character goes to */
+    int len;                      /* 0x8B4 */
+    char unk8B8[0x8D0 - 0x8B8];
+    unsigned int state;           /* 0x8D0: DCPASS_ST_ */
+    int page, row, col;           /* 0x8D4: the keyboard's cursor */
+    int top, listCursor, extra;   /* 0x8E0: the slot list */
+    int chara[14];                /* 0x8EC: -1 = free */
+    char unk924[0x964 - 0x924];
+    int flags;                    /* 0x964: DCPASS_ */
+    char unk968[0x97C - 0x968];
+} A11yDcPass;
+LAYOUT_ASSERT(offsetof(A11yDcPass, text) == 0x868 && offsetof(A11yDcPass, cursor) == 0x8B0 &&
+               offsetof(A11yDcPass, state) == 0x8D0 && offsetof(A11yDcPass, chara) == 0x8EC &&
+               offsetof(A11yDcPass, flags) == 0x964 && sizeof(A11yDcPass) == 0x97C, "DcPass");
+extern char gDcPassKeys[2][5][14]; /* src/menu/menu_z_d.c: characters, or the codes below */
+#define DCPASS_CELLS 34
+#define DCPASS_SLOTS 14
+#define DCPASS_ST_TYPE 0
+#define DCPASS_ST_LIST 3
+#define DCPASS_LEAVE 1
+#define DCPASS_LEAVING 2
+#define DCPASS_STARTED 4
+#define DCKEY_CODES 7
+#define DCKEY_ZERO 4
+
+static A11yDcPass sDcPass;
+static int sDcPassBlank; /* the blank the copy was taken on (0: never) */
+
+void PortA11y_DcPass(unsigned int pass) {
+    if (!sOn || gPortResim || pass == 0) {
+        return;
+    }
+    memcpy(&sDcPass, (const void *)(uintptr_t)pass, sizeof(sDcPass));
+    sDcPassBlank = sBlank;
+}
+
+/* Descriptive: the three buttons and the wide keys are pictures. */
+static const char *const kDcKeys[DCKEY_CODES] = {
+    "Quit", "Capitals or small letters", "Confirm password", "Delete character", NULL, "Cursor left", "Cursor right",
+};
+static const char kDcSymbols[] = "#$%&@!?-+*()";
+static const char *const kDcSymbolNames[12] = {
+    "Hash", "Dollar", "Percent", "Ampersand", "At", "Exclamation mark",
+    "Question mark", "Hyphen", "Plus", "Asterisk", "Left parenthesis", "Right parenthesis",
+};
+
+/* How a password character (or a key code) is said: a screen reader may skip a bare symbol and does not tell a
+   capital from a small letter. */
+static void pass_char_name(char *out, int cap, int c) {
+    const char *sym;
+
+    if (c == DCKEY_ZERO) {
+        c = '0';
+    }
+    if (c >= 0 && c < DCKEY_CODES) {
+        snprintf(out, cap, "%s", tr(kDcKeys[c]));
+    } else if (c >= 'A' && c <= 'Z') {
+        snprintf(out, cap, tr("Capital %c"), c);
+    } else if (c == ' ') {
+        snprintf(out, cap, "%s", tr("empty"));
+    } else if (c != '\0' && (sym = strchr(kDcSymbols, c)) != NULL) {
+        snprintf(out, cap, "%s", tr(kDcSymbolNames[sym - kDcSymbols]));
+    } else {
+        snprintf(out, cap, "%c", c);
+    }
+}
+
+static void dc_pass(void) {
+    static int open, state, key, cells, cursor, slot;
+    static char shown[DCPASS_CELLS];
+    A11yDcPass *p = &sDcPass;
+    char text[A11Y_TEXT], name[256];
+    int k, n, i, idx;
+    size_t len;
+
+    if (sDcPassBlank == 0 || sBlank - sDcPassBlank > 2) { /* (not run lately: the screen is gone) */
+        open = 0;
+        return;
+    }
+    if (!(p->flags & DCPASS_STARTED) || (p->flags & (DCPASS_LEAVE | DCPASS_LEAVING))) {
+        return;
+    }
+    if (!open) {
+        open = 1;
+        state = key = cells = cursor = slot = -1;
+        memset(shown, ' ', sizeof(shown));
+        heading(tr("Password entry"));
+    }
+    switch (p->state) {
+    case DCPASS_ST_TYPE:
+        if (p->page < 0 || p->page > 1 || p->row < 0 || p->row > 4 || p->col < 0 || p->col > 13) {
+            break;
+        }
+        k = (unsigned char)gDcPassKeys[p->page][p->row][p->col];
+        for (n = 0, i = 0; i < DCPASS_CELLS; i++) {
+            n += p->text[i] != ' ' && p->text[i] != '\0';
+        }
+        if (cells >= 0 && memcmp(shown, p->text, sizeof(shown)) != 0) {
+            snprintf(text, sizeof(text), n < cells ? tr("Deleted. Characters: %d") : tr("Characters: %d"), n);
+            PortA11y_Say(text, A11Y_INTERRUPT);
+        } else if (cursor >= 0 && p->cursor != cursor && p->cursor >= 0 && p->cursor < DCPASS_CELLS) {
+            pass_char_name(name, sizeof(name), p->text[p->cursor]);
+            snprintf(text, sizeof(text), tr("Position %d: %s"), p->cursor + 1, name);
+            PortA11y_Say(text, A11Y_INTERRUPT);
+        } else if (state != DCPASS_ST_TYPE || k != key) {
+            pass_char_name(name, sizeof(name), k);
+            PortA11y_Say(name, follow());
+        }
+        key = k;
+        cells = n;
+        cursor = p->cursor;
+        memcpy(shown, p->text, sizeof(shown));
+        break;
+    case DCPASS_ST_LIST:
+        idx = p->top + p->listCursor;
+        if (idx < 0 || idx >= DCPASS_SLOTS || (state == DCPASS_ST_LIST && idx == slot)) {
+            break;
+        }
+        slot = idx;
+        if (p->chara[idx] < 0) {
+            snprintf(text, sizeof(text), tr("Slot %d: free"), idx + 1);
+        } else {
+            len = (size_t)snprintf(text, sizeof(text), tr("Slot %d: "), idx + 1);
+            chara_name(text + len, (int)(sizeof(text) - len), p->nameText, p->formText, p->chara[idx]);
+        }
+        add_position(text, sizeof(text), idx, DCPASS_SLOTS);
+        PortA11y_Say(text, follow());
+        break;
+    default:
+        break;
+    }
+    state = (int)p->state;
+}
+
+/* The customising screen of Evolution Z (mode 49, EvoZ: src/menu/menu_v_b.c, include/menu/menu_v.h) after a
+   character is chosen: the menu, the three item sets, the eight slots with their four actions, the list of owned
+   items, the password window and the page that turns Z Points into experience. The grid before it is char_ref's.
+   The menu rows and the actions are pictures: their names here are descriptions of what EvoZ_Input does. */
+typedef struct {
+    unsigned short id[3][8];      /* 0x00: the three item sets, 1-based items, 0 = empty */
+    int exp;                      /* 0x30 */
+    unsigned short level, unk36;  /* 0x34 */
+} A11yEvoCustom;                  /* include/menu/menu_v.h: VSaveCustom */
+typedef struct {
+    char unk0[0x20];
+    uint32_t GAME_PTR text[3];    /* 0x0020: [2] the item names, by 0-based item */
+    char unk2C[0x22C - 0x2C];
+    int flags;                    /* 0x022C: EVOZ_ */
+    int cur[11];                  /* 0x0230: [1] menu row, [2] item set, [3] slot row, [5] digit, [8] slot action */
+    int leaveTimer;
+    int state;                    /* 0x0260: EVOZ_ST_ */
+    int faceState;
+    int listSide;
+    int helpItem;                 /* 0x026C: 0-based item of the details page */
+    int zp;                       /* 0x0270: Z Points chosen on the points page */
+    int set;                      /* 0x0274: item set being edited */
+    int lastTab;
+    int curItem;
+    int rowsUsed;                 /* 0x0280 */
+    int dialog;                   /* 0x0284: 0 = closed */
+    char unk288[0x2A0 - 0x288];
+    int col, row;                 /* 0x02A0: the grid cursor: the save's cell is col + row * 7 */
+    char unk2A8[0x30C - 0x2A8];
+    int chara;                    /* 0x030C */
+    char unk310[0x1A60 - 0x310];
+    int capacity;                 /* 0x1A60: item slots of the character */
+    int fits;                     /* 0x1A64: item slots the set takes */
+    int kind;
+    int exp;
+    int nextExp;                  /* 0x1A70: 0 at the last level */
+    int expLeft;                  /* 0x1A74 */
+    char unk1A78[0x1A98 - 0x1A78];
+    A11yShopList list;            /* 0x1A98: the owned items that can be equipped */
+    A11yShopItem GAME_PTR items;  /* 0x30C8 */
+} A11yEvoZ;
+LAYOUT_ASSERT(sizeof(A11yEvoCustom) == 0x38 && offsetof(A11yEvoZ, flags) == 0x22C &&
+               offsetof(A11yEvoZ, state) == 0x260 && offsetof(A11yEvoZ, rowsUsed) == 0x280 &&
+               offsetof(A11yEvoZ, chara) == 0x30C && offsetof(A11yEvoZ, capacity) == 0x1A60 &&
+               offsetof(A11yEvoZ, list) == 0x1A98 && offsetof(A11yEvoZ, items) == 0x30C8, "EvoZ");
+extern A11yEvoZ GAME_PTR gEvoZ;
+extern char GAME_PTR ChrPass_GetText(void); /* src/sys/misc_a_b.c: the password the window shows */
+#define EVOZ_STARTED 4
+#define EVOZ_ST_GRID 0
+#define EVOZ_ST_MENU 1
+#define EVOZ_ST_SLOTS 3
+#define EVOZ_ST_PASSWORD 4
+#define EVOZ_ST_ZP 5
+#define EVOZ_ST_LEVEL_UP 7
+#define EVOZ_ST_HELP 9
+#define EVOZ_ST_LIST 10
+#define EVOZ_SLOTS 8
+#define EVOZ_CELLS 97
+#define SAVE_CUSTOM_OFFSET 0x1808
+
+static const char *const kEvoMenu[3] = {"Equip Z items", "Show password", "Use Z Points"};
+static const char *const kEvoActions[4] = {"Change", "Details", "Remove", "Remove all"};
+
+/* The name of 1-based item `id`, "Empty" for 0. */
+static void evo_item_name(char *out, int cap, A11yEvoZ GAME_PTR ez, int id) {
+    if (id <= 0) {
+        snprintf(out, cap, "%s", tr("Empty"));
+    } else if (id > SAVE_ITEMS || text_line(out, cap, ez->text[2], id - 1) == 0) {
+        snprintf(out, cap, tr("Item %d"), id);
+    }
+}
+
+static void evo_custom(void) {
+    static int state = -1, row, set, act, tab, idx, zp, digit, item;
+    A11yEvoZ GAME_PTR ez = gEvoZ;
+    A11yEvoCustom GAME_PTR cu;
+    A11yShopList GAME_PTR l;
+    char GAME_PTR pass;
+    char text[A11Y_TEXT], name[256];
+    int cell, id, i, n, step, entering;
+    size_t len;
+
+    if (ez == NULL || gSaveData == NULL) {
+        state = -1;
+        return;
+    }
+    cell = ez->col + ez->row * MCHR_COLS;
+    if (!(ez->flags & EVOZ_STARTED) || ez->dialog != 0 || cell < 0 || cell >= EVOZ_CELLS || ez->set < 0 || ez->set > 2) {
+        return;
+    }
+    cu = (A11yEvoCustom GAME_PTR)((char GAME_PTR)gSaveData + SAVE_CUSTOM_OFFSET) + cell;
+    entering = state != ez->state;
+    text[0] = '\0';
+    switch (ez->state) {
+    case EVOZ_ST_MENU:
+        if (ez->cur[1] < 0 || ez->cur[1] > 2 || ez->cur[2] < 0 || ez->cur[2] > 2) {
+            return;
+        }
+        if (!entering && row == ez->cur[1] && set == ez->cur[2]) {
+            break;
+        }
+        if (!entering && set != ez->cur[2]) { /* left and right change the item set */
+            snprintf(text, sizeof(text), tr("Item set %d"), ez->cur[2] + 1);
+            add_position(text, sizeof(text), ez->cur[2], 3);
+        } else {
+            snprintf(text, sizeof(text), "%s", tr(kEvoMenu[ez->cur[1]]));
+            if (ez->cur[1] == 2 && ez->nextExp == 0) {
+                len = strlen(text);
+                snprintf(text + len, sizeof(text) - len, "%s", tr(", not available"));
+            }
+            add_position(text, sizeof(text), ez->cur[1], 3);
+            if (state == EVOZ_ST_GRID || state == -1) { /* a character was just chosen */
+                len = strlen(text);
+                snprintf(text + len, sizeof(text) - len, tr(". Item set %d of 3. Item slots: %d"), ez->cur[2] + 1,
+                         ez->capacity);
+            }
+        }
+        row = ez->cur[1];
+        set = ez->cur[2];
+        PortA11y_Say(text, A11Y_INTERRUPT);
+        break;
+    case EVOZ_ST_SLOTS:
+        if (ez->cur[3] < 0 || ez->cur[3] >= EVOZ_SLOTS || ez->cur[8] < 0 || ez->cur[8] > 3) {
+            return;
+        }
+        id = cu->id[ez->set][ez->cur[3]];
+        if (entering || row != ez->cur[3] || item != id) {
+            evo_item_name(name, sizeof(name), ez, id);
+            len = 0;
+            if (entering && state != EVOZ_ST_HELP && state != EVOZ_ST_LIST) {
+                len = (size_t)snprintf(text, sizeof(text), tr("Item set %d. Slots used: %d of %d. "), ez->set + 1,
+                                       ez->fits, ez->capacity);
+            }
+            snprintf(text + len, sizeof(text) - len, tr("Slot %d: %s"), ez->cur[3] + 1, name);
+            if (entering) {
+                len = strlen(text);
+                snprintf(text + len, sizeof(text) - len, ". %s", tr(kEvoActions[ez->cur[8]]));
+            }
+            PortA11y_Say(text, A11Y_INTERRUPT);
+        } else if (act != ez->cur[8]) {
+            say_item(tr(kEvoActions[ez->cur[8]]), ez->cur[8], 4, A11Y_INTERRUPT);
+        }
+        row = ez->cur[3];
+        item = id;
+        act = ez->cur[8];
+        break;
+    case EVOZ_ST_LIST:
+        l = &ez->list;
+        if (l->tab < 0 || l->tab >= SHOP_TABS) {
+            return;
+        }
+        n = l->count[l->tab];
+        i = l->cur[l->tab];
+        if (!entering && tab == l->tab && idx == i) {
+            break;
+        }
+        len = 0;
+        if (entering || tab != l->tab) {
+            len = (size_t)snprintf(text, sizeof(text), tr("Tab %d of %d%s. "), l->tab + 1, SHOP_TABS, "");
+        }
+        if (n <= 0 || n > SAVE_ITEMS || i < 0 || i >= n) {
+            snprintf(text + len, sizeof(text) - len, "%s", tr("No items"));
+        } else {
+            id = l->ids[l->tab][i];
+            evo_item_name(text + len, (int)(sizeof(text) - len), ez, id + 1);
+            if (ez->items != NULL && id >= 0 && id < SAVE_ITEMS && ez->items[id].slots > 0) {
+                len = strlen(text);
+                snprintf(text + len, sizeof(text) - len, tr(", slots: %d"), ez->items[id].slots);
+            }
+            add_position(text, sizeof(text), i, n);
+        }
+        tab = l->tab;
+        idx = i;
+        PortA11y_Say(text, A11Y_INTERRUPT);
+        break;
+    case EVOZ_ST_HELP:
+        if (entering) {
+            item_help(ez->helpItem);
+        }
+        break;
+    case EVOZ_ST_PASSWORD:
+        if (entering) {
+            /* Character by character: it has to be copied exactly. */
+            pass = ChrPass_GetText();
+            len = (size_t)snprintf(text, sizeof(text), "%s", tr("Password: "));
+            for (i = 0; pass != NULL && i < DCPASS_CELLS && pass[i] != '\0' && len < sizeof(text) - 40; i++) {
+                pass_char_name(name, sizeof(name), (unsigned char)pass[i]);
+                len += (size_t)snprintf(text + len, sizeof(text) - len, "%s%s", i > 0 ? ", " : "", name);
+            }
+            say_long(text, A11Y_INTERRUPT);
+        }
+        break;
+    case EVOZ_ST_ZP:
+        if (ez->cur[5] < 0 || ez->cur[5] > 4) {
+            return;
+        }
+        if (entering) {
+            snprintf(text, sizeof(text), tr("Z Points to use: %d. You have %d. To the next level: %d"), ez->zp,
+                     gSaveData->money, ez->expLeft);
+        } else if (zp != ez->zp) {
+            snprintf(text, sizeof(text), "%d", ez->zp);
+        } else if (digit != ez->cur[5]) {
+            for (step = 1, i = 0; i < ez->cur[5]; i++) {
+                step *= 10;
+            }
+            snprintf(text, sizeof(text), tr("Step: %d"), step);
+        }
+        zp = ez->zp;
+        digit = ez->cur[5];
+        if (text[0] != '\0') {
+            PortA11y_Say(text, A11Y_INTERRUPT);
+        }
+        break;
+    case EVOZ_ST_LEVEL_UP:
+        if (entering) {
+            PortA11y_Say(tr("Level up!"), A11Y_INTERRUPT);
+        }
+        break;
+    default:
+        break;
+    }
+    state = ez->state;
+}
+
 void PortA11y_GameTick(void) {
     int v;
 
@@ -4350,6 +4943,7 @@ void PortA11y_GameTick(void) {
     options();
     char_select();
     solo_select();
+    ub_team_select();
     entry_select();
     ub_menu();
     plates();
@@ -4360,11 +4954,14 @@ void PortA11y_GameTick(void) {
     train_menu();
     survival_select();
     sim_top();
+    sim_day();
     bracket();
     team_select();
     replay_menu();
     char_ref();
     shop();
+    evo_custom();
+    dc_pass();
     disc_fusion();
     btl_menu();
     msg_window();

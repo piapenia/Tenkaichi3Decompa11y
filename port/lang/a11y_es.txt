@@ -2708,7 +2708,7 @@ a84ae7f1cd7cd90c	Mods con scripts: scripts de Lua en la carpeta "%s" junto al ju
 # . Best: time %d:%02d:%02d, score %d
 de16bf5d0d0e3b7a	. Mejor marca: tiempo %d:%02d:%02d, puntaje %d
 # Customize characters
-42231fb21eb6867c	Personalizar personajes
+42231fb21eb6867c	Personalizar personaje
 # About Evolution Z
 24ff10abc8711b3d	Acerca de Evolución Z
 # Passwords
@@ -2839,3 +2839,103 @@ eee7946ff684b639	Mostrar botones
 2075fca505ff2c9b	Mientras se mantiene la carga: tus técnicas y especiales con sus botones y costos, en la esquina de abajo.
 # The release's signature (Tenkaichi3Decomp-windows-x64.zip.sig) could not be downloaded or read. Try again later.
 66f0fb917481dc60	No se pudo descargar o leer la firma de la versión. Probá de nuevo más tarde.
+# Day %d of %d
+68a45e90f758f760	Día %d de %d
+# , round %d
+462dae433dc23d14	, ronda %d
+# Health %d percent
+9dff11106d53b415	Salud %d por ciento
+# Attack %d
+21509b1e0ddc6a06	Ataque %d
+# Defense %d
+c6c6bf585539c540	Defensa %d
+# %d points
+7564c425c3e338eb	%d puntos
+# Level %d
+a97e6c64f67358c6	Nivel %d
+# . Fighters: %d
+ba50b30967f0fefa	. Luchadores: %d
+# . DP limit: %d
+5bd3c8ebb3546697	. Límite de DP: %d
+# , %d DP
+9955e71f0113b00c	, %d DP
+# Password entry
+0e822dce5b07078c	Ingreso de contraseña
+# Quit
+45156213b0fb2396	Salir
+# Capitals or small letters
+a5ed72b2bdfacf1f	Mayúsculas o minúsculas
+# Confirm password
+5515a136187c74c0	Confirmar contraseña
+# Cursor left
+e0093867580abdf8	Cursor a la izquierda
+# Cursor right
+5e1de3e3fc26662d	Cursor a la derecha
+# Hash
+58cb9fd8758aebf1	Numeral
+# Dollar
+b1f2e5190094b6df	Signo de pesos
+# Percent
+6471dfb2f0b9deda	Porcentaje
+# Ampersand
+381c3f93a7c1a664	Et
+# At
+09084e07b5a0c848	Arroba
+# Exclamation mark
+0579b8e630844bbb	Signo de exclamación
+# Question mark
+dee685a67cc64c0a	Signo de pregunta
+# Hyphen
+aa6f03c34c2654a1	Guion
+# Plus
+cce75a19b57e0095	Más
+# Asterisk
+021596d53b130701	Asterisco
+# Left parenthesis
+98f36618a94fc744	Abrir paréntesis
+# Right parenthesis
+73790d18829fcee9	Cerrar paréntesis
+# Capital %c
+6e9786135382bb2d	%c mayúscula
+# Deleted. Characters: %d
+4eee0f5648c0d1f3	Borrado. Caracteres: %d
+# Characters: %d
+2c881dc9f917095a	Caracteres: %d
+# Position %d: %s
+cb48b0b880fb7711	Posición %d: %s
+# Slot %d: free
+22db196ef254ede6	Lugar %d: libre
+# Slot %d: 
+fc7965bd7aeb71f8	Lugar %d: 
+# Equip Z items
+4a49f37535da9f0d	Equipar objetos Z
+# Show password
+2f7f35f6a5b733f5	Ver contraseña
+# Use Z Points
+6ea42feff2f10d61	Usar puntos Z
+# Change
+2f64461723d3df5d	Cambiar
+# Remove
+ea4f08110bb8f15d	Quitar
+# Remove all
+f59f359396914fa2	Quitar todos
+# , not available
+59a89424b4506631	, no disponible
+# . Item set %d of 3. Item slots: %d
+e210c26a6702dd70	. Juego de objetos %d de 3. Casillas de objetos: %d
+# Item set %d. Slots used: %d of %d. 
+851d3be85ae81d68	Juego de objetos %d. Casillas usadas: %d de %d. 
+# Slot %d: %s
+0518c02e5966ec9c	Ranura %d: %s
+# , slots: %d
+64429c7feb3fe3e9	, casillas: %d
+# Password: 
+e64f6881ee7eb7b2	Contraseña: 
+# Z Points to use: %d. You have %d. To the next level: %d
+0943bd3feb4f5413	Puntos Z a usar: %d. Tienes %d. Para el próximo nivel: %d
+# Step: %d
+481aa6a7ce35fea4	Paso: %d
+# Level up!
+2ad1fe904f155d89	¡Subes de nivel!
+# Delete character
+7cbb8d1ad31e7f29	Borrar
