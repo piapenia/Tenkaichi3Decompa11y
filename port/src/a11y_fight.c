@@ -152,18 +152,20 @@ enum { TONE_DISTANCE, TONE_DISTANCE_CLOSE, TONE_EDGE_WALL, TONE_EDGE_TOP, TONE_E
 
 /* The alerts and how each is told (a bit each: 1 a sound, 2 the screen reader). */
 enum { ALERT_DISTANCE, ALERT_EDGE, ALERT_HEALTH, ALERT_POWER, ALERT_GAUGES, ALERT_MOMENTS, ALERT_NAMES, ALERT_INTRO, ALERT_WHERE,
-       ALERTS };
+       ALERT_TIME, ALERT_COMBO, ALERT_LOCK, ALERTS };
 #define BY_SOUND 1
 #define BY_VOICE 2
 /* (ALERT_MOMENTS: health down to two bars and to one, ki full, max power, told by themselves; ALERT_NAMES: the text
    the game shows in a fight, the techniques' names, said by the reader (a11y_game.c, shown_text); ALERT_INTRO: who
    against whom and where, said while the fight's opening plays (a11y_game.c, fight_intro): both 0 or BY_VOICE;
-   ALERT_WHERE: where the rival is, told by itself (where_auto); 0 is "only when asked with Select") */
+   ALERT_WHERE: where the rival is, told by itself (where_auto); 0 is "only when asked with Select";
+   ALERT_TIME: the time limit down to 60, 30 and 10 seconds; ALERT_COMBO: a combo of three hits or more, once it has
+   ended; ALERT_LOCK: the lock on the rival lost and found again: these three 0 or BY_VOICE, off by default) */
 static const char *const kKeys[ALERTS] = {"a11y_alert_distance", "a11y_alert_edge", "a11y_alert_health", "a11y_alert_power",
                                           "a11y_gauges", "a11y_alert_moments", "a11y_technique_names", "a11y_fight_intro",
-                                          "a11y_alert_where"};
-static const int kDefaults[ALERTS] = {0, 0, 0, BY_SOUND, BY_SOUND, BY_VOICE, BY_VOICE, BY_VOICE, BY_SOUND | BY_VOICE};
-static int sMode[ALERTS] = {-1, -1, -1, -1, -1, -1, -1, -1, -1};
+                                          "a11y_alert_where", "a11y_alert_time", "a11y_alert_combo", "a11y_alert_lock"};
+static const int kDefaults[ALERTS] = {0, 0, 0, BY_SOUND, BY_SOUND, BY_VOICE, BY_VOICE, BY_VOICE, BY_SOUND | BY_VOICE, 0, 0, 0};
+static int sMode[ALERTS] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 /* The gauges are told some way whenever they are asked for (1 sound, 2 voice, 3 both), and also by themselves with
    4..6 (the same three ways): each time one of them changes (gauges_auto, a11y_game.c), for whoever would rather not
@@ -222,7 +224,7 @@ void PortA11y_AllByItself(void) {
     int i;
 
     for (i = 0; i < ALERTS; i++) {
-        PortA11y_SetAlertMode(i, i == ALERT_GAUGES ? 3 + GAUGES_BY_ITSELF : i == ALERT_NAMES || i == ALERT_INTRO ? BY_VOICE : BY_SOUND | BY_VOICE);
+        PortA11y_SetAlertMode(i, i == ALERT_GAUGES ? 3 + GAUGES_BY_ITSELF : i == ALERT_NAMES || i == ALERT_INTRO || i >= ALERT_TIME ? BY_VOICE : BY_SOUND | BY_VOICE);
     }
     Port_SettingsWrite();
 }
@@ -248,7 +250,7 @@ static int sProfile = -1; /* this run: -1 not decided yet, 0 not applied by itse
 
 void PortA11y_ApplyProfile(void) {
     static const int kProfile[ALERTS] = {BY_SOUND, BY_SOUND, BY_SOUND, BY_SOUND | BY_VOICE, BY_SOUND | BY_VOICE, BY_VOICE, BY_VOICE, BY_VOICE,
-                                         BY_SOUND | BY_VOICE};
+                                         BY_SOUND | BY_VOICE, 0, 0, 0}; /* (time, combo and lock: off, as by default) */
     int i;
 
     for (i = 0; i < ALERTS; i++) {
@@ -946,13 +948,171 @@ static void moments(void) {
     }
 }
 
+/* ---- the time limit, the combos and the lock, told by the screen reader (off by default) ---- */
+extern int BtlSeq_GetTimeLeft(void);                                         /* src/battle/btl_seq.c: seconds left, -1 no limit */
+extern int BtlSide_GetComboHits(int side), BtlSide_GetComboDamage(int side); /* src/battle/btl_capi_b.c (only read) */
+
+/* The time limit as it passes 60, 30 and 10 seconds. The clock as the fight finds it is taken unsaid. */
+static void time_left(int fresh) {
+    static const int kMarks[3] = {60, 30, 10};
+    static int last = -1;
+    int now = BtlSeq_GetTimeLeft(), i;
+    char text[96];
+
+    if (fresh || now < 0 || last < 0 || now > last) { /* (a new fight, no limit, or the clock set again) */
+        last = now;
+        return;
+    }
+    for (i = 0; i < 3; i++) {
+        if (last > kMarks[i] && now <= kMarks[i] && now > 0) {
+            snprintf(text, sizeof(text), tr("%d seconds left"), kMarks[i]);
+            PortA11y_Say(text, 0);
+            moment_note(text);
+        }
+    }
+    last = now;
+}
+
+/* A combo of three hits or more, said once it has ended (while it goes on the hits are heard): who landed it, how
+   many hits and the damage the game counted. */
+static void combos(int fresh) {
+    static int hits[2], damage[2];
+    int side, now, dmg;
+    char text[128];
+
+    for (side = 0; side < 2; side++) {
+        now = BtlSide_GetComboHits(side);
+        dmg = BtlSide_GetComboDamage(side);
+        if (fresh) {
+            hits[side] = now;
+            damage[side] = 0;
+            continue;
+        }
+        if (now >= hits[side] && now > 0) {
+            hits[side] = now;
+            damage[side] = dmg > damage[side] ? dmg : damage[side];
+            continue;
+        }
+        if (hits[side] >= 3) {
+            if (damage[side] > 0) {
+                snprintf(text, sizeof(text), tr("Player %d: combo of %d hits, %d damage"), side + 1, hits[side], damage[side]);
+            } else {
+                snprintf(text, sizeof(text), tr("Player %d: combo of %d hits"), side + 1, hits[side]);
+            }
+            PortA11y_Say(text, 0);
+            moment_note(text);
+        }
+        hits[side] = now;
+        damage[side] = now > 0 && dmg > 0 ? dmg : 0;
+    }
+}
+
+/* The lock on the rival (fighter flag 5) lost, and found again: said once the new state has held a third of a
+   second, so that a vanish or a hit that drops it for a moment says nothing. The state a fight starts with is taken
+   unsaid. */
+#define LOCK_HOLD 20
+static void lock_state(int me, int fresh) {
+    static int said = -1, held;
+    int now = BtlCharApi_IsLockedOn(me) != 0;
+    const char *text;
+
+    if (fresh || said < 0) {
+        said = now;
+        held = 0;
+        return;
+    }
+    if (now == said) {
+        held = 0;
+        return;
+    }
+    if (++held < LOCK_HOLD) {
+        return;
+    }
+    said = now;
+    held = 0;
+    text = now ? tr("Locked on") : tr("Lock lost");
+    PortA11y_Say(text, 0);
+    moment_note(text);
+}
+
+/* ---- the fighter's techniques and what each costs, asked for (F8, or four taps of Select) ----
+ *
+ * What the skill list of the mods draws while charge is held (gs/mods.c, from FpSide.moves): the two Blast 1 skills
+ * with their cost in blast stocks, the two Blast 2 techniques and the Ultimate Blast with their cost in ki bars, each
+ * with the buttons that do it and whether the gauges reach now. The names are the game's own, read from the fighter
+ * as it is on screen (fight_panels.c). */
+#include "gs/fight_panels.h"
+extern const char *PortA11y_ActionName(int player, int action); /* gs/a11y_pad.c: a game button by the controller */
+#define ACT_UP 0 /* gs_input.c, kActions */
+#define ACT_DOWN 1
+#define ACT_CIRCLE 5
+#define ACT_TRIANGLE 7
+#define ACT_L2 10
+#define BLAST_STOCK 100000
+
+static const char *button(int player, int action, const char *fallback) {
+    const char *name = PortA11y_ActionName(player, action);
+
+    return name != NULL ? name : fallback;
+}
+
+void PortA11y_SkillsQuery(int side) {
+    static const struct { int with, press; } kHow[FP_MOVES] = {{-1, ACT_CIRCLE}, {ACT_UP, ACT_CIRCLE}, {-1, ACT_TRIANGLE},
+                                                               {ACT_UP, ACT_TRIANGLE}, {ACT_DOWN, ACT_TRIANGLE}};
+    static const char *const kNames[8] = {"D-pad up", "D-pad down", "", "", "", "Circle", "", "Triangle"};
+    static FpState st;
+    const FpSide *s;
+    char text[1024], how[160], cost[96], note[64];
+    size_t n = 0;
+    int i, units, tenths, have, any = 0, player = Port_NetActive() ? 0 : side & 1;
+
+    if (!PortPanels_Read(&st) || !st.battle || !st.side[side & 1].found) {
+        return;
+    }
+    s = &st.side[side & 1];
+    text[0] = '\0';
+    for (i = 0; i < FP_MOVES && n < sizeof(text) - 1; i++) {
+        if (s->moves[i].name[0] == '\0') {
+            continue;
+        }
+        if (kHow[i].with >= 0) {
+            snprintf(how, sizeof(how), tr("%s with %s and %s"), button(player, ACT_L2, "L2"),
+                     button(player, kHow[i].with, kNames[kHow[i].with]), button(player, kHow[i].press, kNames[kHow[i].press]));
+        } else {
+            snprintf(how, sizeof(how), tr("%s with %s"), button(player, ACT_L2, "L2"),
+                     button(player, kHow[i].press, kNames[kHow[i].press]));
+        }
+        if (i < 2) {
+            units = s->moves[i].cost / BLAST_STOCK;
+            have = s->blast >= s->moves[i].cost;
+            snprintf(cost, sizeof(cost), units == 1 ? tr("%d blast stock") : tr("%d blast stocks"), units);
+        } else {
+            units = s->moves[i].cost / KI_BAR;
+            tenths = s->moves[i].cost % KI_BAR * 10 / KI_BAR;
+            have = s->ki >= s->moves[i].cost;
+            if (tenths != 0) {
+                snprintf(cost, sizeof(cost), tr("%d.%d ki bars"), units, tenths);
+            } else {
+                snprintf(cost, sizeof(cost), units == 1 ? tr("%d ki bar") : tr("%d ki bars"), units);
+            }
+        }
+        n += (size_t)snprintf(text + n, sizeof(text) - n, "%s", any ? " " : "");
+        n += (size_t)snprintf(text + n, n < sizeof(text) ? sizeof(text) - n : 0, tr("%s: %s, %s, %s."), s->moves[i].name, how, cost,
+                              have ? tr("enough for it") : tr("not enough for it"));
+        any++;
+    }
+    snprintf(note, sizeof(note), "techniques asked for: player %d, %d told", (side & 1) + 1, any);
+    PortA11y_Note(note);
+    PortA11y_Say(any ? text : tr("No techniques"), A11Y_INTERRUPT);
+}
+
 /* Once per blank from a11y_game.c: `fight` while a fight is on with no menu over it. */
 void PortA11y_FightAlerts(int fight) {
     static int was;
     A11yVec a, b;
     void GAME_PTR chr;
     void GAME_PTR foe;
-    int me;
+    int me, fresh = 0;
 
     if (!fight || BtlChar_FindBySide(0) == NULL || BtlChar_FindBySide(1) == NULL) {
         if (was) {
@@ -964,6 +1124,7 @@ void PortA11y_FightAlerts(int fight) {
     if (!was) {
         char note[288];
         was = 1;
+        fresh = 1;
         sBlank += 600; /* (whatever was waiting from the last fight is due) */
         where_reset();
         extern int PortA11y_CueVolume(void), PortA11y_FightMusic(void); /* gs/a11y.c, a11y_game.c */
@@ -971,6 +1132,9 @@ void PortA11y_FightAlerts(int fight) {
                  "1 sound, 2 voice, 3 both); cues %d %%, music in fights %d %%; the rival's own sounds %s", mode(ALERT_DISTANCE),
                  mode(ALERT_EDGE), mode(ALERT_HEALTH), mode(ALERT_MOMENTS), mode(ALERT_POWER), mode(ALERT_GAUGES), mode(ALERT_WHERE),
                  PortA11y_CueVolume(), PortA11y_FightMusic(), one_you() ? "from the rival's side" : "in the middle (no one \"you\")");
+        PortA11y_Note(note);
+        snprintf(note, sizeof(note), "fight alerts: time %d, combo %d, lock %d (0 off, 2 voice)", mode(ALERT_TIME), mode(ALERT_COMBO),
+                 mode(ALERT_LOCK));
         PortA11y_Note(note);
     }
     sBlank++;
@@ -996,5 +1160,14 @@ void PortA11y_FightAlerts(int fight) {
     }
     if (mode(ALERT_MOMENTS)) {
         moments();
+    }
+    if (mode(ALERT_TIME)) {
+        time_left(fresh);
+    }
+    if (mode(ALERT_COMBO)) {
+        combos(fresh);
+    }
+    if (mode(ALERT_LOCK)) {
+        lock_state(me, fresh);
     }
 }

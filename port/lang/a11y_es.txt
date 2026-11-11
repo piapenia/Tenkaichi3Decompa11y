@@ -1462,8 +1462,6 @@ dcb98818fee0146e	lejos
 f66494d8a426700d	El rival no se ve
 # You are blinded: the rival is not seen
 0fa2eebd457943dd	Te cegaron: no ves al rival
-# Select in a fight (Create on a DualSense, View on an Xbox controller): once, where the rival is, a\nping from there and a few words; twice quickly, your gauges; three times, the rival's. F5 on the keyboard:\nwhere the rival is; F3 and F4: player 1's and player 2's gauges. The gauges as two beeps (yours clean, the\nrival's with a buzz), or health, ki and blast said by the screen reader, or both. "Also by itself": told\ntoo each time a whole bar of health or ki, or a blast stock, comes or goes (the rival's: health and blast),\nwithout pressing anything. Outside a fight, Select says the last message again.
-ecf91f87e5ded3fa	Select en la pelea (Create en un DualSense, Vista en un control de Xbox): una vez, dónde está el rival, un sonido de sonar desde ahí y unas palabras; dos veces rápido, tu estado; tres veces, el del rival. F5 en el teclado: dónde está el rival; F3 y F4: el estado del jugador 1 y del jugador 2. El estado como dos pitidos (el tuyo limpio, el del rival con un zumbido), o la vida, el ki y el blast dichos por el lector de pantalla, o ambos. «También automático»: se dice además cada vez que se gana o se pierde una barra entera de vida o de ki, o un blast (del rival: vida y blast), sin apretar nada. Fuera de la pelea, Select repite el último mensaje.
 # A sonar ping, here from the right
 68392ee553e2d1ac	Un ping de sonar, aquí desde la derecha
 # Where the rival is, Select once in a fight: the ping comes from the rival's side, higher when the rival is above you, lower when below.
@@ -2939,3 +2937,51 @@ e64f6881ee7eb7b2	Contraseña:
 2ad1fe904f155d89	¡Subes de nivel!
 # Delete character
 7cbb8d1ad31e7f29	Borrar
+# %d seconds left
+0c8b848067a96242	Quedan %d segundos
+# , %d seconds left
+770d3c74cd2d9f56	, quedan %d segundos
+# Player %d: combo of %d hits, %d damage
+a9771274966145c5	Jugador %d: combo de %d golpes, %d de daño
+# Player %d: combo of %d hits
+27087609c53b42c1	Jugador %d: combo de %d golpes
+# Locked on
+e1fb495df902e014	Rival fijado
+# Lock lost
+86489397a1fb922c	Fijación perdida
+# %s with %s and %s
+9c1f4b7ace266d6c	%s con %s y %s
+# %s with %s
+e81945f1ff6056b5	%s con %s
+# %d blast stock
+b0d56ee953176ba4	%d reserva de blast
+# %d blast stocks
+92174d7830cc3e55	%d reservas de blast
+# %d.%d ki bars
+05573a2b67de5cc5	%d,%d barras de ki
+# %d ki bar
+8b1b04480a182971	%d barra de ki
+# %d ki bars
+77114869270dae66	%d barras de ki
+# %s: %s, %s, %s.
+65d47c939e1635f7	%s: %s, %s, %s.
+# enough for it
+aabaccd1c8b81bd7	alcanza
+# not enough for it
+1b51ca093b6fd73e	no alcanza
+# No techniques
+debfbb66f811d781	Sin técnicas
+# Time left
+ab77d17fb8dfa0bd	Tiempo restante
+# In a fight with a time limit, the screen reader says when 60, 30 and 10 seconds are left.\nThe gauges asked for with Select say the time left too.
+802f6e9ce8244b51	En una pelea con límite de tiempo, el lector de pantalla avisa cuando quedan 60, 30 y 10 segundos. El estado que se pide con Select también dice el tiempo que queda.
+# Combos
+b288b590a8bd62f6	Combos
+# When a combo of three hits or more ends, the screen reader says whose it was, its hits and its damage.
+893b28405ea710df	Cuando termina un combo de tres golpes o más, el lector de pantalla dice de quién fue, cuántos golpes tuvo y cuánto daño hizo.
+# Lock on the rival
+73a118b7e546c9b8	Fijación del rival
+# The screen reader says when you lose the lock on the rival and when you have it again.
+ce9c0ebbdb1daea2	El lector de pantalla avisa cuando pierdes la fijación del rival y cuando la recuperas.
+# Select in a fight (Create on a DualSense, View on an Xbox controller): once, where the rival is, a\nping from there and a few words; twice quickly, your gauges; three times, the rival's; four times,\nyour techniques with their buttons and what each costs. F5 on the keyboard: where the rival is;\nF3 and F4: player 1's and player 2's gauges; F8: the techniques. The gauges as two beeps (yours clean, the\nrival's with a buzz), or health, ki and blast said by the screen reader, or both. "Also by itself": told\ntoo each time a whole bar of health or ki, or a blast stock, comes or goes (the rival's: health and blast),\nwithout pressing anything. Outside a fight, Select says the last message again.
+9fc6faa56e2fdfff	Select en la pelea (Create en un DualSense, Vista en un control de Xbox): una vez, dónde está el rival, un sonido de sonar desde ahí y unas palabras; dos veces rápido, tu estado; tres veces, el del rival; cuatro veces, tus técnicas con sus botones y lo que cuesta cada una. F5 en el teclado: dónde está el rival; F3 y F4: el estado del jugador 1 y del jugador 2; F8: las técnicas. El estado como dos pitidos (el tuyo limpio, el del rival con un zumbido), o la vida, el ki y el blast dichos por el lector de pantalla, o ambos. «También automático»: se dice además cada vez que se gana o se pierde una barra entera de vida o de ki, o un blast (del rival: vida y blast), sin apretar nada. Fuera de la pelea, Select repite el último mensaje.

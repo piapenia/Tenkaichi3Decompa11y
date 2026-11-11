@@ -2067,8 +2067,9 @@ void A11yUi_Tab(void) {
                    "rival's with a buzz, from the rival's side (in the middle with two players at one computer)."},
         {"Transformation and Ultimate Blast", "When one more transformation or the Ultimate Blast comes within reach."},
         {"Gauges: health, ki and blast", "Select in a fight (Create on a DualSense, View on an Xbox controller): once, where the rival is, a\n"
-                              "ping from there and a few words; twice quickly, your gauges; three times, the rival's. F5 on the keyboard:\n"
-                              "where the rival is; F3 and F4: player 1's and player 2's gauges. The gauges as two beeps (yours clean, the\n"
+                              "ping from there and a few words; twice quickly, your gauges; three times, the rival's; four times,\n"
+                              "your techniques with their buttons and what each costs. F5 on the keyboard: where the rival is;\n"
+                              "F3 and F4: player 1's and player 2's gauges; F8: the techniques. The gauges as two beeps (yours clean, the\n"
                               "rival's with a buzz), or health, ki and blast said by the screen reader, or both. \"Also by itself\": told\n"
                               "too each time a whole bar of health or ki, or a blast stock, comes or goes (the rival's: health and blast),\n"
                               "without pressing anything. Outside a fight, Select says the last message again."},
@@ -2089,6 +2090,11 @@ void A11yUi_Tab(void) {
     static const struct { int alert; const char *label, *tip; } kSaid[] = {
         {6, "Technique names", "In a fight, the screen reader says the text the game shows: the names of the techniques."},
         {7, "Describe the fight", "While a fight's opening plays, the screen reader says who fights whom, and where."},
+        // (ALERT_TIME, ALERT_COMBO, ALERT_LOCK: off by default)
+        {9, "Time left", "In a fight with a time limit, the screen reader says when 60, 30 and 10 seconds are left.\n"
+                         "The gauges asked for with Select say the time left too."},
+        {10, "Combos", "When a combo of three hits or more ends, the screen reader says whose it was, its hits and its damage."},
+        {11, "Lock on the rival", "The screen reader says when you lose the lock on the rival and when you have it again."},
     };
     for (const auto &c : kSaid) {
         bool on = PortA11y_AlertMode(c.alert) != 0;

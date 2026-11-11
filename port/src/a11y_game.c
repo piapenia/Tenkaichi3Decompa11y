@@ -3961,6 +3961,9 @@ extern int PortA11y_GaugesQuery(int side, int byItself); /* a11y_fight.c: the be
 extern int PortA11y_GaugesByItself(void);   /* a11y_fight.c: told as they change too, not only when asked for */
 extern void PortA11y_WhereQuery(void);      /* a11y_fight.c: where the rival is, a ping from there and its words */
 #define ASK_WHERE 3                         /* PortA11y_GaugesAsked: where the rival is (1, 2: a player's gauges) */
+#define ASK_SKILLS 4                        /* a player's techniques and their costs (the side in bit 4) */
+extern void PortA11y_SkillsQuery(int side); /* a11y_fight.c */
+extern int BtlSeq_GetTimeLeft(void);        /* src/battle/btl_seq.c: seconds left, -1 no limit (only read) */
 extern void PortA11y_PowerCue(int side, int kind, int count); /* a11y_fight.c: the cue as a sound, the voice or both */
 extern void PortA11y_FightAlerts(int fight); /* a11y_fight.c: distance, the stage's edge, health */
 extern void PortA11y_FightMenu(int open);    /* gs/a11y.c: a fight's pause menu is open */
@@ -4004,7 +4007,10 @@ static void gauges_say(int side, int flags) {
         n += (size_t)snprintf(text + n, sizeof(text) - n, tr(", max power"));
     }
     if ((alive = BtlSide_CountAlive(side)) > 1 && n < sizeof(text)) {
-        snprintf(text + n, sizeof(text) - n, tr(", %d fighters still up"), alive);
+        n += (size_t)snprintf(text + n, sizeof(text) - n, tr(", %d fighters still up"), alive);
+    }
+    if (BtlSeq_GetTimeLeft() >= 0 && n < sizeof(text)) { /* (the HUD's clock, when the fight has a time limit) */
+        snprintf(text + n, sizeof(text) - n, tr(", %d seconds left"), BtlSeq_GetTimeLeft());
     }
     PortA11y_Say(text, flags);
 }
@@ -4074,6 +4080,10 @@ static void fight_gauges(void) {
     }
     if (ask == ASK_WHERE) {
         PortA11y_WhereQuery();
+        return;
+    }
+    if ((ask & 15) == ASK_SKILLS) {
+        PortA11y_SkillsQuery(Port_NetActive() ? Port_NetMe() & 1 : ask >> 4);
         return;
     }
     if (!(PortA11y_GaugesQuery(side, 0) & 2)) {

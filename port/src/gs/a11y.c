@@ -293,8 +293,9 @@ const char *PortA11y_ReaderName(int kind) {
 /* ---- the speaker ---- */
 
 static volatile int sOn; /* set once by the game's thread before the speaker starts; read by the render thread */
-static int sRepeatKey, sGaugeKey[2], sWhereKey, sCueVolume;
+static int sRepeatKey, sGaugeKey[2], sWhereKey, sSkillsKey, sCueVolume;
 #define ASK_WHERE 3 /* sAsk: where the rival is (1 and 2 are the players' gauges) */
+#define ASK_SKILLS 4 /* the player's techniques and their costs (a11y_fight.c, PortA11y_SkillsQuery) */
 static int sTranslate;         /* the language is not English */
 static char sLang[4] = "en";   /* its code: two or three small letters */
 static int sFrame; /* blanks since the start (only for the log) */
@@ -762,6 +763,7 @@ static void start(void) {
     sGaugeKey[0] = Port_Setting("a11y_key_gauges1", SDL_SCANCODE_F3);
     sGaugeKey[1] = Port_Setting("a11y_key_gauges2", SDL_SCANCODE_F4);
     sWhereKey = Port_Setting("a11y_key_where", SDL_SCANCODE_F5);
+    sSkillsKey = Port_Setting("a11y_key_skills", SDL_SCANCODE_F8);
     sCueVolume = Port_Setting("a11y_cue_volume", 60);
     sCueVolume = sCueVolume < 0 ? 0 : sCueVolume > 100 ? 100 : sCueVolume;
     SDL_SetAtomicInt(&sVoiceRate, voice_percent(Port_Setting("a11y_voice_rate", 50)));
@@ -910,6 +912,8 @@ void PortA11y_Event(const SDL_Event *ev) {
             SDL_SetAtomicInt(&sAsk, (int)ev->key.scancode == sGaugeKey[0] ? 1 : 2);
         } else if ((int)ev->key.scancode == sWhereKey) {
             SDL_SetAtomicInt(&sAsk, ASK_WHERE);
+        } else if ((int)ev->key.scancode == sSkillsKey) {
+            SDL_SetAtomicInt(&sAsk, ASK_SKILLS);
         }
     } else if (ev->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && ev->gbutton.button == SDL_GAMEPAD_BUTTON_TOUCHPAD) {
         side = sTouchX >= 0.5f ? 1 : 0;
@@ -994,7 +998,8 @@ int PortA11y_TakesSelect(void) {
 /* For a11y_game.c, once per blank: whether a fight is on with no menu over it (the touchpad click asks for the gauges
    then), and what was asked for since the last call: 1 + a player's side for the gauges, ASK_WHERE for where the
    rival is, 0 nothing. A row of Select taps that has ended: one, where the rival is; two, the player's own gauges
-   (online, the side this copy plays); three, the rival's. BT3_A11Y_ASK=<n> (tests): every n blanks in turn where,
+   (online, the side this copy plays); three, the rival's; four, that player's techniques and their costs
+   (ASK_SKILLS, with the side in bit 4; F8 on the keyboard asks for player 1's, online this copy's). BT3_A11Y_ASK=<n> (tests): every n blanks in turn where,
    player 1's gauges, where, player 2's. */
 int PortA11y_GaugesAsked(int fight) {
     extern int Port_NetActive(void), Port_NetMe(void); /* net.c */
@@ -1008,11 +1013,11 @@ int PortA11y_GaugesAsked(int fight) {
     ask = SDL_SetAtomicInt(&sAsk, 0);
     if (fight && (taps = tap_row(&player)) > 0) {
         side = Port_NetActive() ? Port_NetMe() & 1 : player;
-        ask = taps == 1 ? ASK_WHERE : 1 + (taps == 2 ? side : side ^ 1);
+        ask = taps == 1 ? ASK_WHERE : taps >= 4 ? ASK_SKILLS + (side << 4) : 1 + (taps == 2 ? side : side ^ 1);
     }
     if (ask == 0 && every > 0 && sFrame % every == 0) {
-        static const int kTurn[4] = {ASK_WHERE, 1, ASK_WHERE, 2};
-        ask = kTurn[sFrame / every & 3];
+        static const int kTurn[8] = {ASK_WHERE, 1, ASK_WHERE, 2, ASK_WHERE, 1, ASK_SKILLS, 2};
+        ask = kTurn[sFrame / every & 7];
     }
     return ask;
 }
